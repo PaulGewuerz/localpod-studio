@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  shows     Show[]
+  subscription Subscription?
+}
+
+model Show {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  episodes    Episode[]
+}
+
+model Episode {
+  id          String   @id @default(uuid())
+  title       String
+  audioUrl    String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  showId      String
+  show        Show     @relation(fields: [showId], references: [id])
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  status    String   @default("trial")
+  plan      String?
+  createdAt DateTime @default(now())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+}
