@@ -10,6 +10,8 @@ app.get('/health', (req, res) => {
 
 app.use('/generate', require('./routes/generate'));
 
+app.use('/auth', require('./routes/auth'));
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`LocalPod backend running on http://localhost:${PORT}`);
