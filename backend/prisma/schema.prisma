@@ -7,12 +7,13 @@ datasource db {
 }
 
 model Organization {
-  id           String        @id @default(uuid())
-  name         String
-  createdAt    DateTime      @default(now())
-  users        User[]
-  shows        Show[]
-  subscription Subscription?
+  id               String        @id @default(uuid())
+  name             String
+  megaphoneShowId  String?
+  createdAt        DateTime      @default(now())
+  users            User[]
+  shows            Show[]
+  subscription     Subscription?
 }
 
 model User {
@@ -34,6 +35,15 @@ model Show {
   episodes       Episode[]
 }
 
+model Voice {
+  id              String    @id @default(uuid())
+  name            String
+  elevenLabsId    String    @unique
+  description     String?
+  previewUrl      String?
+  episodes        Episode[]
+}
+
 model Episode {
   id        String   @id @default(uuid())
   title     String
@@ -42,6 +52,8 @@ model Episode {
   createdAt DateTime @default(now())
   showId    String
   show      Show     @relation(fields: [showId], references: [id])
+  voiceId   String?
+  voice     Voice?   @relation(fields: [voiceId], references: [id])
 }
 
 model Subscription {
