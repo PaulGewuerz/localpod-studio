@@ -9,12 +9,12 @@ const prisma = new PrismaClient({ adapter })
 
 async function main() {
   const voices = [
-    { name: 'Ava', elevenLabsId: 'BHf91PCMVcVwq6r1ku7L', description: 'Warm and conversational' },
-    { name: 'Brian', elevenLabsId: 'nPczCjzI2devNBz1zQrb', description: 'Clear and authoritative' },
-    { name: 'Edwin', elevenLabsId: 'CMUEYyUNA4TrldQy4HLM', description: 'Smooth and professional' },
-    { name: 'Emily', elevenLabsId: 'VUGQSU6BSEjkbudnJbOj', description: 'Friendly and engaging' },
-    { name: 'Shayla', elevenLabsId: 'p4M8XW4N954o56wN9vKM', description: 'Bright and energetic' },
-    { name: 'Thomas', elevenLabsId: 'FzF9ACIefsb6wbrYVjf1', description: 'Deep and trustworthy' },
+    { name: 'Ava',     elevenLabsId: 'BHf91PCMVcVwq6r1ku7L', description: 'Warm and conversational' },
+    { name: 'Brian',   elevenLabsId: 'nPczCjzI2devNBz1zQrb', description: 'Clear and authoritative' },
+    { name: 'Daniel',  elevenLabsId: 'onwK4e9ZLuTAKqWW03F9', description: 'Steady broadcaster' },
+    { name: 'Alice',   elevenLabsId: 'Xb7hH8MSUJpSbSDYk0k2', description: 'Clear and engaging' },
+    { name: 'Matilda', elevenLabsId: 'XrExE9yKIg1WjnnlVkGX', description: 'Knowledgeable and professional' },
+    { name: 'George',  elevenLabsId: 'JBFqnCBsd6RMkjVDRZzb', description: 'Warm and captivating' },
   ]
 
   for (const voice of voices) {

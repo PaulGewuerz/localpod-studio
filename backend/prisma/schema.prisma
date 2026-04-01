@@ -10,10 +10,14 @@ model Organization {
   id               String        @id @default(uuid())
   name             String
   megaphoneShowId  String?
+  megaphoneRssUrl  String?
+  defaultVoiceId   String?
   createdAt        DateTime      @default(now())
-  users            User[]
-  shows            Show[]
-  subscription     Subscription?
+  users                User[]
+  shows                Show[]
+  subscription         Subscription?
+  pronunciationRules   PronunciationRule[]
+  defaultVoice         Voice?        @relation(fields: [defaultVoiceId], references: [id])
 }
 
 model User {
@@ -29,38 +33,63 @@ model Show {
   id             String       @id @default(uuid())
   name           String
   description    String?
-  createdAt      DateTime     @default(now())
+  coverArtUrl    String?
+  author         String?
+  category            String?
+  directoryStatuses   Json?
+  createdAt           DateTime     @default(now())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   episodes       Episode[]
 }
 
 model Voice {
-  id              String    @id @default(uuid())
+  id              String         @id @default(uuid())
   name            String
-  elevenLabsId    String    @unique
+  elevenLabsId    String         @unique
   description     String?
   previewUrl      String?
   episodes        Episode[]
+  orgsDefault     Organization[]
 }
 
 model Episode {
-  id        String   @id @default(uuid())
-  title     String
-  audioUrl  String?
-  status    String   @default("pending")
-  createdAt DateTime @default(now())
-  showId    String
-  show      Show     @relation(fields: [showId], references: [id])
-  voiceId   String?
-  voice     Voice?   @relation(fields: [voiceId], references: [id])
+  id                 String    @id @default(uuid())
+  title              String
+  description        String?
+  scriptText         String?   // normalized text sent to ElevenLabs
+  paragraphMeta      String?   // JSON: [{ order, text, timeStart, timeEnd }]
+  audioUrl           String?
+  // Valid values: draft | approved | published | scheduled
+  status             String    @default("draft")
+  publishedUrl       String?
+  megaphoneEpisodeId String?
+  scheduledAt        DateTime?
+  createdAt          DateTime  @default(now())
+  showId             String
+  show               Show      @relation(fields: [showId], references: [id])
+  voiceId            String?
+  voice              Voice?    @relation(fields: [voiceId], references: [id])
+}
+
+model PronunciationRule {
+  id             String       @id @default(uuid())
+  word           String
+  pronunciation  String
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, word])
 }
 
 model Subscription {
-  id             String       @id @default(uuid())
-  status         String       @default("trial")
-  plan           String?
-  createdAt      DateTime     @default(now())
-  organizationId String       @unique
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  id                   String       @id @default(uuid())
+  status               String       @default("trial")
+  plan                 String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime     @default(now())
+  organizationId       String       @unique
+  organization         Organization @relation(fields: [organizationId], references: [id])
 }

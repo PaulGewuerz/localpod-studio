@@ -46,6 +46,7 @@
     padding: 28px 0;
     position: fixed;
     top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
   }
 
   .sidebar-logo {
@@ -98,11 +99,28 @@
     font-family: 'DM Mono', monospace;
   }
 
-  .sidebar-bottom {
-    margin-top: auto;
-    padding: 20px 24px 0;
-    border-top: 1px solid rgba(255,255,255,0.1);
-  }
+ .sidebar-bottom {
+  margin-top: auto;
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  overflow: visible;
+}
+  .sub-btn {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  background: #2dd4bf;
+  color: #0b0f1a;
+  border: none;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: opacity 0.15s;
+}
+.sub-btn:hover { opacity: 0.85; }
   .usage-label { font-size: 10px; color: rgba(255,255,255,0.35); font-family: 'DM Mono', monospace; margin-bottom: 6px; }
   .usage-bar { background: rgba(255,255,255,0.1); height: 3px; border-radius: 2px; overflow: hidden; }
   .usage-fill { height: 100%; background: var(--accent); width: 62%; border-radius: 2px; }
@@ -544,12 +562,16 @@
     <div class="nav-item" onclick="switchNav(this,'settings')">
       <span class="nav-icon">⊙</span> Settings
     </div>
+    <div class="nav-item" onclick="switchNav(this,'billing')">
+      <span class="nav-icon">◈</span> Billing
+    </div>
   </nav>
 
   <div class="sidebar-bottom">
     <div class="usage-label">Monthly Episodes</div>
     <div class="usage-bar"><div class="usage-fill"></div></div>
     <div class="usage-count">31 / 50 used</div>
+    <button class="sub-btn" onclick="handleSubscribe()">Subscribe — $99/mo</button>
   </div>
 </aside>
 
@@ -917,12 +939,32 @@ Construction on the first phase is expected to begin by late summer.</textarea>
     <div class="view" id="view-dist"><div style="padding:40px 0;color:var(--ink-faint);font-family:'DM Mono',monospace;font-size:13px;">Distribution settings — coming soon</div></div>
     <div class="view" id="view-settings"><div style="padding:40px 0;color:var(--ink-faint);font-family:'DM Mono',monospace;font-size:13px;">Account settings — coming soon</div></div>
 
+    <div class="view" id="view-billing">
+      <div class="section-header">
+        <div class="section-title">Billing</div>
+      </div>
+      <div style="max-width:520px;">
+        <div style="background:#fff;border:1px solid var(--rule);border-radius:8px;padding:28px 32px;margin-bottom:16px;">
+          <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Current Plan</div>
+          <div style="font-size:18px;font-weight:700;font-family:'Nunito',sans-serif;color:var(--ink);margin-bottom:4px;">LocalPod Studio — $99/mo</div>
+          <div style="font-size:13px;color:var(--ink-light);">Unlimited episodes · RSS distribution · Priority support</div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--rule);border-radius:8px;padding:28px 32px;">
+          <div style="font-size:13px;color:var(--ink-light);margin-bottom:20px;">Manage your payment method, download invoices, or cancel your subscription through the Stripe billing portal.</div>
+          <button onclick="handleManageBilling()" id="portal-btn" style="background:var(--ink);color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">
+            Manage Billing →
+          </button>
+          <div id="portal-error" style="display:none;margin-top:12px;font-size:12px;color:var(--accent);font-family:'DM Mono',monospace;"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </main>
 
 <script>
 // NAV
-const navMap = { dashboard:'dashboard',episodes:'episodes',new:'new',shows:'shows',voices:'voices',analytics:'analytics',dist:'dist',settings:'settings' };
+const navMap = { dashboard:'dashboard',episodes:'episodes',new:'new',shows:'shows',voices:'voices',analytics:'analytics',dist:'dist',settings:'settings',billing:'billing' };
 
 function switchNav(el, key) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -931,7 +973,7 @@ function switchNav(el, key) {
   const viewKey = key;
   const view = document.getElementById('view-'+viewKey);
   if (view) view.classList.add('active');
-  const titles = { dashboard:'Dashboard', episodes:'Episodes', new:'New Episode', shows:'Shows', voices:'Voice Library', analytics:'Analytics', dist:'Distribution', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', episodes:'Episodes', new:'New Episode', shows:'Shows', voices:'Voice Library', analytics:'Analytics', dist:'Distribution', settings:'Settings', billing:'Billing' };
   document.getElementById('page-title').textContent = titles[key] || key;
 }
 
@@ -1034,6 +1076,61 @@ function doLogin() {
     document.getElementById('login-screen').classList.add('hidden');
   } else {
     err.classList.add('visible');
+  }
+}
+
+async function handleManageBilling() {
+  const btn = document.getElementById('portal-btn');
+  const errEl = document.getElementById('portal-error');
+  btn.textContent = 'Opening portal...';
+  btn.disabled = true;
+  errEl.style.display = 'none';
+
+  try {
+    // In production, pass the real session token in Authorization header
+    const res = await fetch('http://localhost:3001/billing/portal-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (window.__session_token || ''),
+      },
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error(data.error || 'Could not open billing portal');
+    }
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Manage Billing →';
+    btn.disabled = false;
+  }
+}
+
+async function handleSubscribe() {
+  const btn = document.querySelector('.sub-btn');
+  btn.textContent = 'Redirecting...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('http://localhost:3001/billing/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'paul@localpod.co' })
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      btn.textContent = 'Subscribe — $99/mo';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    console.error(err);
+    btn.textContent = 'Subscribe — $99/mo';
+    btn.disabled = false;
   }
 }
 

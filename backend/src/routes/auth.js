@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const supabase = require('../supabase')
+const { supabase } = require('../supabase')
 
 router.post('/magic-link', async (req, res) => {
   const { email } = req.body

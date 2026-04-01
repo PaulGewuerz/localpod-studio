@@ -1,0 +1,1 @@
+ALTER TABLE "Show" ADD COLUMN "author" TEXT;

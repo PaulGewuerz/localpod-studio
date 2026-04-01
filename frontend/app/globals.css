@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --ink:        #0f0e0d;
+  --ink-light:  #5a5754;
+  --ink-faint:  #a09c99;
+  --rule:       #e8e4e0;
+  --bg:         #faf9f7;
+  --bg-warm:    #f4f1ed;
+  --accent:     #c8401a;
+  --accent-light: #f9ede9;
+  --green:      #1a7a4a;
+  --green-light: #e8f5ee;
+  --blue:       #1a4a7a;
+  --blue-light: #e8eef5;
+  --gold:       #b8860b;
+  --gold-light: #fdf8e8;
+
+  --font-nunito:   var(--font-nunito);
+  --font-dm-sans:  var(--font-dm-sans);
+  --font-dm-mono:  var(--font-dm-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Animations used by the studio dashboard */
+@keyframes lp-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes lp-wave {
+  0%, 100% { height: 4px; }
+  50%       { height: 20px; }
+}
+@keyframes lp-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.lp-spin    { animation: lp-spin  1s linear infinite; }
+.lp-wave    { animation: lp-wave  0.9s ease-in-out infinite; }
+.lp-pulse   { animation: lp-pulse 1s ease-in-out infinite; }
+
+/* Show notes rich-text editor */
+.show-notes-editor:empty:before {
+  content: attr(data-placeholder);
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.show-notes-editor a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
