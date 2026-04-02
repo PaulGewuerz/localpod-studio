@@ -191,8 +191,18 @@ export default function OnboardingPage() {
         ])
 
         if (meRes.status === 403) {
-          // Authenticated in Supabase but no backend account yet — admin needs to create one
-          setError('No account found. Ask your administrator to set up your publisher account.')
+          // New self-signup user — create their backend account then re-fetch
+          const regRes = await fetch(`${API_URL}/auth/register`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (!regRes.ok) { setError('Failed to create account. Please try again.'); return }
+          const meRes2 = await fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })
+          if (!meRes2.ok) { router.replace('/login'); return }
+          const meData2: MeData = await meRes2.json()
+          if (meData2.subscription?.stripeCustomerId) { router.replace('/studio'); return }
+          setMe(meData2)
+          setShowName(meData2.show?.name ?? meData2.org.name)
           return
         }
         if (!meRes.ok) { router.replace('/login'); return }

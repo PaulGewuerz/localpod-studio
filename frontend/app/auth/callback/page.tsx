@@ -10,30 +10,30 @@ export default function AuthCallbackPage() {
   const router = useRouter()
 
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!session) { router.replace('/login'); return }
-
-      // Check if publisher has completed onboarding (has a Stripe customer ID)
+    async function handleSession(session: import('@supabase/supabase-js').Session) {
       try {
         const res = await fetch(`${API_URL}/me`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
-        if (!res.ok) {
-          // Authenticated in Supabase but not found in backend DB — send to onboarding
-          router.replace('/onboarding')
-          return
-        }
+        if (!res.ok) { router.replace('/onboarding'); return }
         const { subscription } = await res.json()
-        if (!subscription?.stripeCustomerId) {
-          router.replace('/onboarding')
-          return
-        }
+        if (!subscription?.stripeCustomerId) { router.replace('/onboarding'); return }
       } catch {
-        router.replace('/onboarding')
-        return
+        router.replace('/onboarding'); return
       }
-
       router.replace('/studio')
+    }
+
+    // OAuth (PKCE) may have already established the session before the listener fires
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) { handleSession(session); return }
+
+      // Not ready yet — wait for the state change
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!session) { router.replace('/login'); return }
+        handleSession(session)
+      })
+      return () => subscription.unsubscribe()
     })
   }, [router])
 
