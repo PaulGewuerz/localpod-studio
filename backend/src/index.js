@@ -7,7 +7,14 @@ app.use('/webhooks', require('./routes/webhooks'));
 
 app.use(express.json());
 const cors = require('cors');
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://app.localpod.co',
+    'http://localhost:3000',
+    'http://192.168.1.202:3000',
+  ],
+  credentials: true,
+}));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
