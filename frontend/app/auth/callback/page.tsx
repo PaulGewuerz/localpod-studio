@@ -36,12 +36,15 @@ export default function AuthCallbackPage() {
 
       // Implicit flow: tokens in URL hash
       const hash = window.location.hash
+      console.log('[callback] hash present:', !!hash)
       if (hash) {
         const params = new URLSearchParams(hash.slice(1))
         const access_token = params.get('access_token')
         const refresh_token = params.get('refresh_token')
+        console.log('[callback] access_token present:', !!access_token, 'refresh_token present:', !!refresh_token)
         if (access_token && refresh_token) {
           const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
+          console.log('[callback] setSession result:', { session: !!data?.session, error: error?.message })
           if (error || !data.session) { router.replace('/login'); return }
           await handleSession(data.session)
           return
