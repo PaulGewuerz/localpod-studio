@@ -25,10 +25,17 @@ export default function AuthCallbackPage() {
     }
 
     async function handleCallback() {
+      const search = window.location.search
+      const hash = window.location.hash
+      console.log('[callback] search:', search)
+      console.log('[callback] hash:', hash)
+
       // Explicitly exchange PKCE code if present in URL
-      const code = new URLSearchParams(window.location.search).get('code')
+      const code = new URLSearchParams(search).get('code')
+      console.log('[callback] code:', code)
       if (code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        console.log('[callback] exchange result:', { session: !!data?.session, error })
         if (error || !data.session) { router.replace('/login'); return }
         await handleSession(data.session)
         return
@@ -36,10 +43,13 @@ export default function AuthCallbackPage() {
 
       // No code — check for existing session (e.g. magic link hash flow)
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('[callback] getSession:', !!session)
       if (session) { await handleSession(session); return }
 
       // Wait for auth state change
+      console.log('[callback] waiting for auth state change...')
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        console.log('[callback] auth state change:', _event, !!session)
         subscription.unsubscribe()
         if (!session) { router.replace('/login'); return }
         handleSession(session)
