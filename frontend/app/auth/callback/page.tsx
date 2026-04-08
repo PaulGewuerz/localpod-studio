@@ -24,17 +24,29 @@ export default function AuthCallbackPage() {
       router.replace('/studio')
     }
 
-    // OAuth (PKCE) may have already established the session before the listener fires
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) { handleSession(session); return }
+    async function handleCallback() {
+      // Explicitly exchange PKCE code if present in URL
+      const code = new URLSearchParams(window.location.search).get('code')
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error || !data.session) { router.replace('/login'); return }
+        await handleSession(data.session)
+        return
+      }
 
-      // Not ready yet — wait for the state change
+      // No code — check for existing session (e.g. magic link hash flow)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) { await handleSession(session); return }
+
+      // Wait for auth state change
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        subscription.unsubscribe()
         if (!session) { router.replace('/login'); return }
         handleSession(session)
       })
-      return () => subscription.unsubscribe()
-    })
+    }
+
+    handleCallback()
   }, [router])
 
   return (
