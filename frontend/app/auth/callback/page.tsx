@@ -43,10 +43,15 @@ export default function AuthCallbackPage() {
         const refresh_token = params.get('refresh_token')
         console.log('[callback] access_token present:', !!access_token, 'refresh_token present:', !!refresh_token)
         if (access_token && refresh_token) {
-          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
-          console.log('[callback] setSession result:', { session: !!data?.session, error: error?.message })
-          if (error || !data.session) { router.replace('/login'); return }
-          await handleSession(data.session)
+          try {
+            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
+            console.log('[callback] setSession result:', { session: !!data?.session, error: error?.message })
+            if (error || !data.session) { router.replace('/login'); return }
+            await handleSession(data.session)
+          } catch (e) {
+            console.log('[callback] setSession threw:', e)
+            router.replace('/login')
+          }
           return
         }
       }
