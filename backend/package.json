@@ -13,14 +13,14 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@prisma/adapter-pg": "^7.5.0",
-    "@prisma/client": "^7.5.0",
+    "@prisma/adapter-pg": "^6.19.3",
+    "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.99.2",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "pg": "^8.20.0",
-    "prisma": "^7.5.0",
+    "prisma": "^6.19.3",
     "resend": "^6.9.4",
     "stripe": "^20.4.1",
     "uuid": "^13.0.0"
