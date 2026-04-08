@@ -25,35 +25,34 @@ export default function AuthCallbackPage() {
     }
 
     async function handleCallback() {
-      const search = window.location.search
-      const hash = window.location.hash
-      console.log('[callback] search:', search)
-      console.log('[callback] hash:', hash)
-
-      // Explicitly exchange PKCE code if present in URL
-      const code = new URLSearchParams(search).get('code')
-      console.log('[callback] code:', code)
+      // PKCE flow: code in query params
+      const code = new URLSearchParams(window.location.search).get('code')
       if (code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-        console.log('[callback] exchange result:', { session: !!data?.session, error })
         if (error || !data.session) { router.replace('/login'); return }
         await handleSession(data.session)
         return
       }
 
-      // No code — check for existing session (e.g. magic link hash flow)
+      // Implicit flow: tokens in URL hash
+      const hash = window.location.hash
+      if (hash) {
+        const params = new URLSearchParams(hash.slice(1))
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token')
+        if (access_token && refresh_token) {
+          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (error || !data.session) { router.replace('/login'); return }
+          await handleSession(data.session)
+          return
+        }
+      }
+
+      // No tokens in URL — check for existing session
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('[callback] getSession:', !!session)
       if (session) { await handleSession(session); return }
 
-      // Wait for auth state change
-      console.log('[callback] waiting for auth state change...')
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        console.log('[callback] auth state change:', _event, !!session)
-        subscription.unsubscribe()
-        if (!session) { router.replace('/login'); return }
-        handleSession(session)
-      })
+      router.replace('/login')
     }
 
     handleCallback()
