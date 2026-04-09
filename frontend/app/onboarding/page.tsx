@@ -293,7 +293,10 @@ export default function OnboardingPage() {
   if (!me) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400">Loading…</p>
+        {error
+          ? <p className="text-red-500 text-sm">{error}</p>
+          : <p className="text-gray-400">Loading…</p>
+        }
       </main>
     )
   }
