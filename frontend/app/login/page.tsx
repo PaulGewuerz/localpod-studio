@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [devLoading, setDevLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   async function handleDevLogin() {
     setDevLoading(true)
@@ -39,6 +41,18 @@ export default function LoginPage() {
       },
     })
     if (error) setError(error.message)
+  }
+
+  async function handleForgotPassword() {
+    if (!email) { setError('Enter your email above first'); return }
+    setResetLoading(true)
+    setError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    })
+    setResetLoading(false)
+    if (error) { setError(error.message); return }
+    setResetSent(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -126,6 +140,7 @@ export default function LoginPage() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
           />
           {error && <p className="text-red-500 text-sm">{error}</p>}
+          {resetSent && <p className="text-green-600 text-sm">Check your email for a password reset link.</p>}
           <button
             type="submit"
             disabled={loading}
@@ -133,6 +148,16 @@ export default function LoginPage() {
           >
             {loading ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
+          {mode === 'signin' && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetLoading}
+              className="w-full text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            >
+              {resetLoading ? 'Sending…' : 'Forgot password?'}
+            </button>
+          )}
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-4">
