@@ -381,7 +381,30 @@ function StudioInner() {
 
 const showNotesRef = useRef<HTMLTextAreaElement>(null)
   const audioFileRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const wordCount = script.trim() ? script.trim().split(/\s+/).length : 0
+
+  async function handlePdfUpload(file: File) {
+    setPdfLoading(true)
+    setPdfError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/extract-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/pdf', Authorization: `Bearer ${token}` },
+        body: file,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to extract PDF')
+      setScript(data.text)
+    } catch (err: unknown) {
+      setPdfError(err instanceof Error ? err.message : 'Failed to extract PDF')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   // ── Auth + initial data load ────────────────────────────────────────────────
 
@@ -964,7 +987,25 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
 
                         {/* Script */}
                         <div className="flex flex-col gap-1.5 mb-5">
-                          <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Script</label>
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Script</label>
+                            <button
+                              type="button"
+                              onClick={() => pdfInputRef.current?.click()}
+                              disabled={pdfLoading}
+                              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
+                            >
+                              {pdfLoading ? 'Extracting…' : '↑ Upload PDF'}
+                            </button>
+                            <input
+                              ref={pdfInputRef}
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfUpload(f); e.target.value = '' }}
+                            />
+                          </div>
+                          {pdfError && <p className="text-[11px] text-red-500 font-[family-name:var(--font-dm-mono)]">{pdfError}</p>}
                           <textarea
                             className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] resize-y min-h-[180px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors"
                             placeholder="Paste your script here…"
