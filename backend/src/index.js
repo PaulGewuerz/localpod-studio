@@ -31,7 +31,6 @@ app.use('/voices', requireActiveSubscription, require('./routes/voices'));
 app.use('/episodes', requireActiveSubscription, require('./routes/episodes'));
 app.use('/me', requireAuth, require('./routes/me'));
 app.use('/auth', require('./routes/auth'));
-app.use('/extract-pdf', requireAuth, require('./routes/extractPdf'));
 
 app.use('/analytics', requireActiveSubscription, require('./routes/analytics'));
 app.use('/billing', require('./routes/billing'));

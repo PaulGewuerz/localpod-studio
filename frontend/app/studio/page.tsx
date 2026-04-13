@@ -390,15 +390,18 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
     setPdfLoading(true)
     setPdfError(null)
     try {
-      const token = await getToken()
-      const res = await fetch(`${API_URL}/extract-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/pdf', Authorization: `Bearer ${token}` },
-        body: file,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to extract PDF')
-      setScript(data.text)
+      const pdfjsLib = await import('pdfjs-dist')
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const pages = await Promise.all(
+        Array.from({ length: pdf.numPages }, (_, i) =>
+          pdf.getPage(i + 1).then(p => p.getTextContent()).then(tc =>
+            tc.items.map((item: { str?: string }) => item.str ?? '').join(' ')
+          )
+        )
+      )
+      setScript(pages.join('\n\n').trim())
     } catch (err: unknown) {
       setPdfError(err instanceof Error ? err.message : 'Failed to extract PDF')
     } finally {
