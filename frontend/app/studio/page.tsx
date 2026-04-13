@@ -397,7 +397,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
       const pages = await Promise.all(
         Array.from({ length: pdf.numPages }, (_, i) =>
           pdf.getPage(i + 1).then(p => p.getTextContent()).then(tc =>
-            tc.items.map((item: { str?: string }) => item.str ?? '').join(' ')
+            tc.items.map((item) => ('str' in item ? item.str : '') ?? '').join(' ')
           )
         )
       )
