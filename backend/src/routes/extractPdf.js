@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pdfParse = require('pdf-parse');
+const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 
 router.post('/', express.raw({ type: 'application/pdf', limit: '20mb' }), async (req, res) => {
   if (!req.body || !req.body.length) {
