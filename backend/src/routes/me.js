@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
       id: org.id,
       name: org.name,
       megaphoneShowId: org.megaphoneShowId,
+      megaphoneRssUrl: org.megaphoneRssUrl ?? null,
       defaultVoice: org.defaultVoice ?? null,
     },
     show: org.shows[0] ?? null,

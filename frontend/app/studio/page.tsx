@@ -30,7 +30,7 @@ interface Episode {
 
 
 interface MeData {
-  org: { id: string; name: string; megaphoneShowId: string | null; defaultVoice: Voice | null }
+  org: { id: string; name: string; megaphoneShowId: string | null; megaphoneRssUrl: string | null; defaultVoice: Voice | null }
   show: { name: string; description: string | null; coverArtUrl: string | null } | null
   subscription: { stripeCustomerId: string | null } | null
 }
@@ -165,8 +165,8 @@ function EpisodeTable({ episodes, onNew, onDelete }: {
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
               </th>
             )}
-            {['Episode', 'Date', 'Voice', 'Status', ''].map(h => (
-              <th key={h} className="text-left px-4 py-2.5 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] font-normal border-b border-[var(--rule)] bg-[var(--bg-warm)]">
+            {(['Episode', 'Date', 'Voice', 'Status', ''] as const).map(h => (
+              <th key={h} className={`text-left px-4 py-2.5 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] font-normal border-b border-[var(--rule)] bg-[var(--bg-warm)]${h === 'Date' || h === 'Voice' ? ' hidden sm:table-cell' : ''}`}>
                 {h}
               </th>
             ))}
@@ -183,10 +183,10 @@ function EpisodeTable({ episodes, onNew, onDelete }: {
               <td className="px-4 py-3 border-b border-[var(--rule)]">
                 <a href={`/episodes/${ep.id}/review`} className="font-medium text-[13px] text-[var(--ink)] hover:text-[var(--accent)] transition-colors">{ep.title}</a>
               </td>
-              <td className="px-4 py-3 border-b border-[var(--rule)] text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
+              <td className="hidden sm:table-cell px-4 py-3 border-b border-[var(--rule)] text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
                 {ep.status === 'draft' ? '—' : ep.scheduledAt ? fmtDate(ep.scheduledAt) : fmtDate(ep.createdAt)}
               </td>
-              <td className="px-4 py-3 border-b border-[var(--rule)] text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
+              <td className="hidden sm:table-cell px-4 py-3 border-b border-[var(--rule)] text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
                 {ep.voice?.name ?? '—'}
               </td>
               <td className="px-4 py-3 border-b border-[var(--rule)]">
@@ -263,7 +263,7 @@ function AnalyticsView() {
   return (
     <div>
       {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Total Downloads</div>
           <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
@@ -357,6 +357,9 @@ function StudioInner() {
   const [processingStep, setProcessingStep] = useState(0) // 0-3
   const [episodeId, setEpisodeId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+
+  // Mobile nav
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   // Billing
   const [portalLoading, setPortalLoading] = useState(false)
@@ -688,7 +691,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
     const active = activeNav === navKey
     return (
       <button
-        onClick={() => { setActiveNav(navKey); if (navKey === 'new') resetNewEpisode() }}
+        onClick={() => { setActiveNav(navKey); if (navKey === 'new') resetNewEpisode(); setMobileNavOpen(false) }}
         className={`w-full flex items-center gap-2.5 px-6 py-2.5 text-[13px] text-left transition-all border-l-2 ${
           active
             ? 'text-white border-[var(--accent)] bg-white/[0.07]'
@@ -723,8 +726,13 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
   return (
     <div className="flex min-h-screen bg-[var(--bg)]">
 
+      {/* ── MOBILE BACKDROP ─────────────────────────────────────────── */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 bg-black/40 z-30 sm:hidden" onClick={() => setMobileNavOpen(false)} />
+      )}
+
       {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
-      <aside className="w-[220px] shrink-0 bg-[var(--ink)] text-white flex flex-col py-7 fixed top-0 left-0 bottom-0 overflow-y-auto z-40">
+      <aside className={`w-[220px] shrink-0 bg-[var(--ink)] text-white flex flex-col py-7 fixed top-0 left-0 bottom-0 overflow-y-auto z-40 transition-transform duration-200 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}`}>
 
         {/* Logo */}
         <div className="px-6 pb-7 border-b border-white/10 mb-5">
@@ -783,15 +791,26 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────── */}
-      <main className="ml-[220px] flex-1 flex flex-col min-h-screen">
+      <main className="sm:ml-[220px] flex-1 flex flex-col min-h-screen">
 
         {/* Top bar */}
-        <header className="bg-white border-b border-[var(--rule)] px-8 h-14 flex items-center justify-between sticky top-0 z-30">
-          <h1 className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)]">
-            {NAV_TITLES[activeNav]}
-          </h1>
+        <header className="bg-white border-b border-[var(--rule)] px-4 sm:px-8 h-14 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              className="sm:hidden flex flex-col gap-[5px] p-1"
+              onClick={() => setMobileNavOpen(v => !v)}
+              aria-label="Open menu"
+            >
+              <span className="w-5 h-[1.5px] bg-[var(--ink)] block" />
+              <span className="w-5 h-[1.5px] bg-[var(--ink)] block" />
+              <span className="w-5 h-[1.5px] bg-[var(--ink)] block" />
+            </button>
+            <h1 className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)]">
+              {NAV_TITLES[activeNav]}
+            </h1>
+          </div>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
+            <span className="hidden sm:flex items-center gap-1.5 text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
               <span className="w-2 h-2 rounded-full bg-[var(--green)] inline-block" />
               All systems operational
             </span>
@@ -802,13 +821,13 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
         </header>
 
         {/* Content */}
-        <div className="p-8 flex-1">
+        <div className="p-4 sm:p-8 flex-1">
 
           {/* ── DASHBOARD ─────────────────────────────────────────────── */}
           {activeNav === 'dashboard' && (
             <div>
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-4 mb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: 'Episodes Published', value: publishedCount.toString(), delta: `${episodes.filter(e => e.status === 'published').length} total` },
                   { label: 'Drafts', value: episodes.filter(e => e.status === 'draft').length.toString(), delta: 'Not yet published' },
@@ -883,7 +902,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
 
                   <div className="p-6">
                     {/* Title */}
-                    <div className="grid grid-cols-2 gap-5 mb-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Episode Title</label>
                         <input
@@ -1161,8 +1180,9 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
           {activeNav === 'dist' && (
             <div className="max-w-xl space-y-6">
               {/* Embed player */}
-              {me.org.megaphoneShowId && (() => {
-                const embedCode = `<iframe src="https://playlist.megaphone.fm?p=${me.org.megaphoneShowId}" width="100%" height="482" frameborder="0"></iframe>`
+              {me.org.megaphoneRssUrl && (() => {
+                const externalId = me.org.megaphoneRssUrl.split('/').pop()
+                const embedCode = `<iframe src="https://playlist.megaphone.fm?p=${externalId}" width="100%" height="482" frameborder="0"></iframe>`
                 return (
                   <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                     <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Embed Player</div>
@@ -1175,7 +1195,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
                     </div>
                     <div className="mt-6 border border-[var(--rule)] rounded-[4px] overflow-hidden">
                       <iframe
-                        src={`https://playlist.megaphone.fm?p=${me.org.megaphoneShowId}`}
+                        src={`https://playlist.megaphone.fm?p=${me.org.megaphoneRssUrl!.split('/').pop()}`}
                         width="100%"
                         height="482"
                         frameBorder={0}
