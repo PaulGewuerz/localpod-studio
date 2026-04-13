@@ -65,7 +65,7 @@ class MegaphoneAdapter {
     if (ownerName)  body.ownerName = ownerName;
     if (ownerEmail) body.ownerEmail = ownerEmail;
     const data = await this.#request('POST', `/networks/${this.networkId}/podcasts`, body);
-    const rssUrl = data.rssUrl || data.rss_url || `https://feeds.megaphone.fm/${data.id}`;
+    const rssUrl = data.feedUrl || data.rssUrl || data.rss_url || `https://feeds.megaphone.fm/${data.id}`;
     return { id: data.id, rssUrl };
   }
 
