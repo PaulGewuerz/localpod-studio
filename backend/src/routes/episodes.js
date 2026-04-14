@@ -60,6 +60,25 @@ router.get('/:id', async (req, res) => {
   res.json(episode);
 });
 
+// PATCH /episodes/:id — update title and/or description
+router.patch('/:id', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+  const { title, description } = req.body;
+
+  const episode = await prisma.episode.findUnique({ where: { id }, include: { show: true } });
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+
+  const data = {};
+  if (title !== undefined) data.title = title;
+  if (description !== undefined) data.description = description;
+
+  const updated = await prisma.episode.update({ where: { id }, data });
+  res.json({ title: updated.title, description: updated.description });
+});
+
 // PATCH /episodes/:id/approve — approve and publish to Megaphone
 router.patch('/:id/approve', async (req, res) => {
   const orgId = req.user.organization.id;

@@ -53,6 +53,12 @@ export default function EpisodeReviewPage() {
 
   const [downloads, setDownloads] = useState<number | null>(null)
 
+  // Title / description editing
+  const [editingMeta, setEditingMeta] = useState(false)
+  const [editedTitle, setEditedTitle] = useState('')
+  const [editedDescription, setEditedDescription] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
+
   const [approving, setApproving] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
@@ -167,6 +173,38 @@ export default function EpisodeReviewPage() {
     }
   }
 
+  function startEditMeta() {
+    setEditedTitle(episode!.title)
+    setEditedDescription(episode!.description ?? '')
+    setEditingMeta(true)
+    setActionError(null)
+  }
+
+  async function handleSaveMeta() {
+    if (!editedTitle.trim()) { setActionError('Title cannot be empty.'); return }
+    setSavingMeta(true)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: editedTitle.trim(), description: editedDescription.trim() || null }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Save failed (${res.status})`)
+      }
+      const updated = await res.json()
+      setEpisode(prev => prev ? { ...prev, title: updated.title, description: updated.description } : prev)
+      setEditingMeta(false)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setSavingMeta(false)
+    }
+  }
+
   async function handleApprove() {
     setApproving(true)
     setActionError(null)
@@ -244,8 +282,40 @@ export default function EpisodeReviewPage() {
         </button>
         <span className="text-[var(--rule)]">|</span>
         <h1 className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)] truncate flex-1">
-          {episode.title}
+          {editingMeta ? (
+            <input
+              autoFocus
+              value={editedTitle}
+              onChange={e => setEditedTitle(e.target.value)}
+              className="w-full border-b border-[var(--ink)] bg-transparent focus:outline-none font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)]"
+            />
+          ) : episode.title}
         </h1>
+        {!editingMeta && (
+          <button
+            onClick={startEditMeta}
+            className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors shrink-0"
+          >
+            Edit title & description
+          </button>
+        )}
+        {editingMeta && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => { setEditingMeta(false); setActionError(null) }}
+              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveMeta}
+              disabled={savingMeta}
+              className="px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+            >
+              {savingMeta ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        )}
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[2px] text-[10px] font-medium font-[family-name:var(--font-dm-mono)] uppercase tracking-[0.04em] ${
           episode.status === 'approved'  ? 'bg-[var(--blue-light)] text-[var(--blue)]' :
           episode.status === 'published' ? 'bg-[var(--green-light)] text-[var(--green)]' :
@@ -260,23 +330,29 @@ export default function EpisodeReviewPage() {
 
         {/* Meta: description + downloads */}
         <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6 flex flex-col gap-4">
-          {episode.description && (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-1.5">Description</div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-1.5">Description</div>
+            {editingMeta ? (
+              <textarea
+                value={editedDescription}
+                onChange={e => setEditedDescription(e.target.value)}
+                placeholder="Optional episode description"
+                className="w-full border border-[var(--rule)] rounded-[2px] px-3 py-2.5 text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--ink)] resize-y min-h-[80px] transition-colors"
+              />
+            ) : episode.description ? (
               <p
                 className="text-[13px] text-[var(--ink-light)] leading-relaxed [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2"
                 dangerouslySetInnerHTML={{ __html: episode.description }}
               />
-            </div>
-          )}
+            ) : (
+              <p className="text-[13px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">No description set.</p>
+            )}
+          </div>
           {downloads !== null && (
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-1.5">Downloads</div>
               <p className="text-[22px] font-bold font-[family-name:var(--font-nunito)] text-[var(--ink)] leading-none">{downloads.toLocaleString()}</p>
             </div>
-          )}
-          {!episode.description && downloads === null && (
-            <p className="text-[13px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">No description set.</p>
           )}
         </div>
 
