@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalPod Studio — The audio platform built for local media</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:     #0b0f1a;
+      --navy-mid: #111827;
+      --navy-card:#151d2e;
+      --navy-border: rgba(255,255,255,0.08);
+      --teal:     #2dd4bf;
+      --teal-dim: #1a9e8f;
+      --white:    #ffffff;
+      --off-white:#e2e8f0;
+      --muted:    #64748b;
+      --text:     #cbd5e1;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 56px;
+      background: rgba(11,15,26,0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--navy-border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--white);
+    }
+
+    .nav-logo img { height: 30px; width: auto; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover { color: var(--white); }
+
+    .nav-cta {
+      background: var(--white);
+      color: var(--navy);
+      padding: 10px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+      box-shadow: 0 8px 24px rgba(45,212,191,0.25);
+    }
+
+    .nav-cta:hover {
+      background: var(--teal);
+      transform: translateY(-1px);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 140px 48px 100px;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(45,212,191,0.11) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 0%, transparent 100%);
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(45,212,191,0.1);
+      border: 1px solid rgba(45,212,191,0.25);
+      padding: 6px 16px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--teal);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--teal);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .hero-headline {
+      font-size: clamp(44px, 6vw, 78px);
+      font-weight: 700;
+      line-height: 1.0;
+      letter-spacing: -0.03em;
+      color: var(--white);
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+      max-width: 880px;
+    }
+
+    .hero-headline .teal { color: var(--teal); }
+
+    .hero-sub {
+      font-size: 20px;
+      font-weight: 300;
+      color: var(--text);
+      max-width: 540px;
+      margin: 0 auto 52px;
+      line-height: 1.65;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      margin-bottom: 16px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--teal);
+      color: var(--navy);
+      padding: 16px 36px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--white);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 40px rgba(45,212,191,0.3);
+    }
+
+    /* ── VIDEO ── */
+    .video-wrap {
+      width: 100%;
+      max-width: 860px;
+      margin: 72px auto 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .video-frame {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--navy-border);
+      box-shadow:
+        0 0 0 1px rgba(45,212,191,0.08),
+        0 32px 80px rgba(0,0,0,0.6),
+        0 0 120px rgba(45,212,191,0.05);
+    }
+
+    .video-frame iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .section {
+      padding: 100px 80px;
+    }
+
+    .section-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 20px;
+    }
+
+    .section-tag::before {
+      content: '';
+      width: 20px; height: 1px;
+      background: var(--teal);
+    }
+
+    .section-headline {
+      font-size: clamp(30px, 3.5vw, 46px);
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 56px;
+      max-width: 520px;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--navy-border);
+      border: 1px solid var(--navy-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .step {
+      background: var(--navy-card);
+      padding: 44px 36px;
+      transition: background 0.2s;
+    }
+
+    .step:hover { background: #1a2236; }
+
+    .step-num {
+      font-size: 52px;
+      font-weight: 800;
+      color: rgba(45,212,191,0.15);
+      line-height: 1;
+      margin-bottom: 24px;
+    }
+
+    .step h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+
+    .step p { font-size: 15px; color: var(--text); line-height: 1.7; }
+
+    /* ── VALUE PROPS ── */
+    .value-section { padding: 0 80px 100px; }
+
+    .value-grid {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .value-card {
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 12px;
+      padding: 40px;
+      transition: border-color 0.2s, transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .value-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(45,212,191,0.35), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .value-card:hover { border-color: rgba(45,212,191,0.2); transform: translateY(-2px); }
+    .value-card:hover::before { opacity: 1; }
+
+    .card-icon {
+      width: 44px; height: 44px;
+      background: rgba(45,212,191,0.1);
+      border: 1px solid rgba(45,212,191,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--teal);
+      margin-bottom: 24px;
+    }
+
+    .value-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+
+    .value-card p { font-size: 15px; color: var(--text); line-height: 1.7; }
+
+    /* ── CTA ── */
+    .cta-section { padding: 0 80px 120px; }
+
+    .cta-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 16px;
+      padding: 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-inner::before {
+      content: '';
+      position: absolute;
+      top: -150px; left: 50%;
+      transform: translateX(-50%);
+      width: 500px; height: 400px;
+      background: radial-gradient(ellipse, rgba(45,212,191,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta-inner .section-tag { justify-content: center; }
+
+    .cta-headline {
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-sub {
+      font-size: 18px;
+      font-weight: 300;
+      color: var(--text);
+      max-width: 480px;
+      margin: 0 auto 48px;
+      line-height: 1.65;
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta-inner .btn-primary {
+      position: relative;
+      z-index: 1;
+      font-size: 16px;
+      padding: 18px 48px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 28px 80px;
+      border-top: 1px solid var(--navy-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer p { font-size: 13px; color: var(--muted); }
+    footer a { font-size: 13px; color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--teal); }
+
+    /* ── ANIMATIONS ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(28px);
+      animation: fadeUp 0.75s cubic-bezier(0.16,1,0.3,1) forwards;
+    }
+    .d1 { animation-delay: 0.05s; }
+    .d2 { animation-delay: 0.15s; }
+    .d3 { animation-delay: 0.25s; }
+    .d4 { animation-delay: 0.35s; }
+    .d5 { animation-delay: 0.45s; }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .hero { padding: 120px 24px 80px; }
+      .section { padding: 72px 24px; }
+      .value-section { padding: 0 24px 72px; }
+      .cta-section { padding: 0 24px 80px; }
+      .cta-inner { padding: 48px 28px; }
+      footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
+      .steps { grid-template-columns: 1fr; }
+      .value-grid { grid-template-columns: 1fr; }
+      .hero-actions { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="logo.png" alt="LocalPod Studio" />
+  </a>
+  <div class="nav-links">
+    <a href="/pricing" class="nav-link">Pricing</a>
+    <a href="/about" class="nav-link">About</a>
+  </div>
+  <a href="https://app.localpod.co" class="nav-cta">Log In / Sign Up</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge fade-up d1">Now accepting founding newsrooms</div>
+  <h1 class="hero-headline fade-up d2">
+    The audio platform<br><span class="teal">built for local media.</span>
+  </h1>
+  <p class="hero-sub fade-up d3">
+    Turn your existing articles into broadcast-quality podcasts — automatically. No studio. No staff. No extra hours.
+  </p>
+  <div class="hero-actions fade-up d4">
+    <a href="https://app.localpod.co" class="btn-primary">
+      Get Started
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+    </a>
+  </div>
+
+  <div class="video-wrap fade-up d5">
+    <div class="video-frame">
+      <iframe src="https://www.youtube.com/embed/mvO4jIa5_ic" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-tag">How it works</div>
+    <h2 class="section-headline">From story to stream — without the friction.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Paste your article</h3>
+        <p>Drop in any story you've already written. No prep work. LocalPod Studio reads it as-is.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Choose your voice</h3>
+        <p>Select from professional AI narrators tuned for news delivery — or request a custom branded voice for your outlet.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Publish to all podcast apps</h3>
+        <p>Your episode goes live on Apple Podcasts, Spotify, and your RSS feed — with show notes included.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VALUE PROPS -->
+<section class="value-section">
+  <div class="value-grid">
+    <div class="value-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+      </div>
+      <h3>No extra time required</h3>
+      <p>Every story you publish could be a podcast episode you didn't have to produce. Your reporters keep reporting — LocalPod handles the rest.</p>
+    </div>
+    <div class="value-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3>Reach listeners who don't read</h3>
+      <p>Audio audiences skew younger and mobile-first. LocalPod Studio opens your coverage to an entirely new segment of your community.</p>
+    </div>
+    <div class="value-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <h3>A new monetization channel</h3>
+      <p>Podcast sponsorships, custom ad creation, and membership integrations — built for the economics of local media.</p>
+    </div>
+    <div class="value-card">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <h3>Designed for small teams</h3>
+      <p>No audio engineer. No editor. No learning curve. If you can publish a story, you can publish a podcast.</p>
+    </div>
+    <div class="value-card" style="grid-column: 1 / -1;">
+      <div class="card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+      <h3>Publish any audio you already have</h3>
+      <p>Got a recorded interview, a city council meeting, or a press conference on tape? Upload it directly and LocalPod Studio will turn it into an episode — no article required.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-started">
+  <div class="cta-inner">
+    <div class="section-tag">Early access</div>
+    <h2 class="cta-headline">Be a founding newsroom.</h2>
+    <p class="cta-sub">We're opening LocalPod Studio to a small group of local publishers first. Founding members get locked-in pricing and a direct line to shape the product.</p>
+    <a href="https://app.localpod.co" class="btn-primary">
+      Get Started
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 LocalPod Studio. All rights reserved.</p>
+  <a href="mailto:paul@localpod.co">paul@localpod.co</a>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.step, .value-card').forEach((el) => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>

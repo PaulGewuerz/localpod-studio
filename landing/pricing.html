@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — LocalPod Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:     #0b0f1a;
+      --navy-mid: #111827;
+      --navy-card:#151d2e;
+      --navy-border: rgba(255,255,255,0.08);
+      --teal:     #2dd4bf;
+      --teal-dim: #1a9e8f;
+      --white:    #ffffff;
+      --off-white:#e2e8f0;
+      --muted:    #64748b;
+      --text:     #cbd5e1;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 56px;
+      background: rgba(11,15,26,0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--navy-border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo img { height: 30px; width: auto; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover { color: var(--white); }
+    .nav-link.active { color: var(--white); }
+
+    .nav-cta {
+      background: var(--white);
+      color: var(--navy);
+      padding: 10px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+      box-shadow: 0 8px 24px rgba(45,212,191,0.25);
+    }
+
+    .nav-cta:hover {
+      background: var(--teal);
+      transform: translateY(-1px);
+    }
+
+    /* ── PAGE ── */
+    .page-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 140px 48px 100px;
+    }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(45,212,191,0.1);
+      border: 1px solid rgba(45,212,191,0.25);
+      padding: 6px 16px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--teal);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+
+    .page-headline {
+      font-size: clamp(36px, 5vw, 60px);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--white);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .page-sub {
+      font-size: 18px;
+      font-weight: 300;
+      color: var(--text);
+      max-width: 480px;
+      text-align: center;
+      line-height: 1.65;
+      margin-bottom: 72px;
+    }
+
+    /* ── PRICING CARD ── */
+    .pricing-wrap {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .pricing-card {
+      background: var(--navy-card);
+      border: 1px solid rgba(45,212,191,0.25);
+      border-radius: 16px;
+      padding: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(45,212,191,0.5), transparent);
+    }
+
+    .plan-badge {
+      display: inline-block;
+      background: rgba(45,212,191,0.1);
+      border: 1px solid rgba(45,212,191,0.25);
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+    }
+
+    .plan-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 8px;
+    }
+
+    .plan-price {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .price-amount {
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--white);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .price-period {
+      font-size: 16px;
+      color: var(--muted);
+      padding-bottom: 8px;
+    }
+
+    .plan-desc {
+      font-size: 14px;
+      color: var(--text);
+      margin-bottom: 36px;
+      line-height: 1.6;
+    }
+
+    .features-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .features-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    .features-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(45,212,191,0.12);
+      border: 1px solid rgba(45,212,191,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .check svg { color: var(--teal); }
+
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: var(--teal);
+      color: var(--navy);
+      padding: 16px 32px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--white);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 40px rgba(45,212,191,0.25);
+    }
+
+    /* ── ENTERPRISE ── */
+    .enterprise-note {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .enterprise-note a {
+      color: var(--teal);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .enterprise-note a:hover { color: var(--white); }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 28px 80px;
+      border-top: 1px solid var(--navy-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer p { font-size: 13px; color: var(--muted); }
+    footer a { font-size: 13px; color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--teal); }
+
+    @media (max-width: 900px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .page-content { padding: 120px 24px 80px; }
+      .pricing-card { padding: 32px 24px; }
+      footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="logo.png" alt="LocalPod Studio" />
+  </a>
+  <div class="nav-links">
+    <a href="/pricing" class="nav-link active">Pricing</a>
+    <a href="/about" class="nav-link">About</a>
+  </div>
+  <a href="https://app.localpod.co" class="nav-cta">Log In / Sign Up</a>
+</nav>
+
+<!-- CONTENT -->
+<main class="page-content">
+  <div class="section-tag">Pricing</div>
+  <h1 class="page-headline">Simple, transparent pricing.</h1>
+  <p class="page-sub">Everything you need to turn your newsroom into a podcast network — no hidden fees, no per-episode charges.</p>
+
+  <div class="pricing-wrap">
+    <div class="pricing-card">
+      <div class="plan-badge">Publisher</div>
+      <div class="plan-name">LocalPod Studio</div>
+      <div class="plan-price">
+        <span class="price-amount">$149</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <p class="plan-desc">Everything a local newsroom needs to launch and grow a podcast — with no technical overhead.</p>
+
+      <div class="features-label">What's included</div>
+      <ul class="features-list">
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          150,000 AI-narrated characters per month
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Unlimited episodes per month
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Standard audio uploads (interviews, recordings)
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Distribution to Apple Podcasts, Spotify, and all major apps
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Custom podcast intro with music branding
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Professional AI narration voices
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Episode scheduling and draft management
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Download analytics and listener stats
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Custom pronunciation dictionary
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Priority support
+        </li>
+      </ul>
+
+      <a href="https://app.localpod.co" class="btn-primary">
+        Get Started
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    </div>
+
+    <p class="enterprise-note">
+      Running a network or multiple publications? <a href="mailto:paul@localpod.co">Contact us</a> about enterprise pricing.
+    </p>
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 LocalPod Studio. All rights reserved.</p>
+  <a href="mailto:paul@localpod.co">paul@localpod.co</a>
+</footer>
+
+</body>
+</html>

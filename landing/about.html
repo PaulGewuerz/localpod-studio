@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — LocalPod Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:     #0b0f1a;
+      --navy-mid: #111827;
+      --navy-card:#151d2e;
+      --navy-border: rgba(255,255,255,0.08);
+      --teal:     #2dd4bf;
+      --teal-dim: #1a9e8f;
+      --white:    #ffffff;
+      --off-white:#e2e8f0;
+      --muted:    #64748b;
+      --text:     #cbd5e1;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 56px;
+      background: rgba(11,15,26,0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--navy-border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo img { height: 30px; width: auto; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover { color: var(--white); }
+    .nav-link.active { color: var(--white); }
+
+    .nav-cta {
+      background: var(--white);
+      color: var(--navy);
+      padding: 10px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+      box-shadow: 0 8px 24px rgba(45,212,191,0.25);
+    }
+
+    .nav-cta:hover {
+      background: var(--teal);
+      transform: translateY(-1px);
+    }
+
+    /* ── PAGE CONTENT ── */
+    .page-content {
+      flex: 1;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 140px 48px 100px;
+    }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(45,212,191,0.1);
+      border: 1px solid rgba(45,212,191,0.25);
+      padding: 6px 16px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--teal);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+
+    .page-headline {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--white);
+      margin-bottom: 32px;
+    }
+
+    .about-block {
+      margin-bottom: 48px;
+    }
+
+    .about-block h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--teal);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+
+    .about-block p {
+      font-size: 17px;
+      font-weight: 300;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--navy-border);
+      margin: 48px 0;
+    }
+
+    .founder-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 28px;
+      margin-top: 24px;
+    }
+
+    .founder-photo {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center top;
+      flex-shrink: 0;
+      border: 2px solid var(--navy-border);
+    }
+
+    .founder-text p {
+      font-size: 17px;
+      font-weight: 300;
+      color: var(--text);
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    .founder-text p:last-child { margin-bottom: 0; }
+
+    .linkedin-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--teal);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .linkedin-link:hover { color: var(--white); }
+
+    @media (max-width: 600px) {
+      .founder-card { flex-direction: column; }
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 28px 80px;
+      border-top: 1px solid var(--navy-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer p { font-size: 13px; color: var(--muted); }
+    footer a { font-size: 13px; color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--teal); }
+
+    @media (max-width: 900px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .page-content { padding: 120px 24px 80px; }
+      footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="logo.png" alt="LocalPod Studio" />
+  </a>
+  <div class="nav-links">
+    <a href="/pricing" class="nav-link">Pricing</a>
+    <a href="/about" class="nav-link active">About</a>
+  </div>
+  <a href="https://app.localpod.co" class="nav-cta">Log In / Sign Up</a>
+</nav>
+
+<!-- CONTENT -->
+<main class="page-content">
+  <div class="section-tag">About</div>
+  <h1 class="page-headline">Built for local journalism.</h1>
+
+  <div class="about-block">
+    <h2>What is LocalPod Studio?</h2>
+    <p>
+      LocalPod Studio is an audio publishing platform designed specifically for local news organizations. We turn your existing written stories into broadcast-quality podcast episodes — automatically, without a studio, audio engineer, or extra hours from your team.
+    </p>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="about-block">
+    <h2>Our Mission</h2>
+    <p>
+      Local newsrooms are doing some of the most important journalism in America — and they're doing it with fewer resources than ever. Our mission is to help local publishers reach new audiences, create new revenue streams, and extend the life of the stories they're already working hard to produce.
+    </p>
+    <p style="margin-top: 16px;">
+      We believe every community deserves a local voice in audio — not just the ones with big budgets.
+    </p>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="about-block">
+    <h2>The Founder</h2>
+    <div class="founder-card">
+      <img src="paul-gewuerz.jpg" alt="Paul Gewuerz" class="founder-photo" />
+      <div class="founder-text">
+        <p>
+          A few years ago, my wife and I moved from a major metro area to a smaller town, and I realized something was missing: I had no easy way to keep up with what was happening locally.
+        </p>
+        <p>
+          Back in the city, news was everywhere — my social media feed, local newsletters, radio, and even casual conversations. But in a smaller town, without an existing personal network, I found myself feeling disconnected. I kept thinking: <em>Why isn't there a local news podcast that just shows up in my feed every morning?</em>
+        </p>
+        <p>
+          That's where the idea for LocalPod started. I wanted to help local publishers deliver news in a growing format people are already consuming — audio. Podcasts make news more accessible, whether you're on your morning commute, walking the dog, or just multitasking.
+        </p>
+        <p>
+          Local news is essential, but it's struggling to reach audiences where they are. Our mission at LocalPod is to help change that.
+        </p>
+        <a href="https://www.linkedin.com/in/paul-gewuerz/" target="_blank" class="linkedin-link">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+          Connect on LinkedIn
+        </a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 LocalPod Studio. All rights reserved.</p>
+  <a href="mailto:paul@localpod.co">paul@localpod.co</a>
+</footer>
+
+</body>
+</html>
