@@ -21,6 +21,7 @@ router.get('/', async (req, res) => {
       status: true,
       audioUrl: true,
       publishedUrl: true,
+      characterCount: true,
       megaphoneEpisodeId: true,
       scheduledAt: true,
       createdAt: true,
@@ -234,7 +235,7 @@ router.post('/:id/regenerate', async (req, res) => {
 
   const updated = await prisma.episode.update({
     where: { id },
-    data: { audioUrl: publicUrl, scriptText, status: 'draft' },
+    data: { audioUrl: publicUrl, scriptText, characterCount: normalizedText.length, status: 'draft' },
   });
 
   res.json({ episodeId: updated.id, audioUrl: updated.audioUrl, status: updated.status });

@@ -65,6 +65,7 @@ model Episode {
   status             String    @default("draft")
   publishedUrl       String?
   megaphoneEpisodeId String?
+  characterCount     Int?
   scheduledAt        DateTime?
   createdAt          DateTime  @default(now())
   showId             String

@@ -126,6 +126,7 @@ router.post('/', async (req, res) => {
       title: title || 'Untitled Episode',
       description: description || null,
       scriptText: processedText,
+      characterCount: processedText.length,
       paragraphMeta: paragraphMeta ? JSON.stringify(paragraphMeta) : null,
       audioUrl: publicUrl,
       status: 'draft',

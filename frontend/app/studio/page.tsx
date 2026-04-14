@@ -23,6 +23,7 @@ interface Episode {
   audioUrl: string | null
   publishedUrl: string | null
   megaphoneEpisodeId: string | null
+  characterCount: number | null
   scheduledAt: string | null
   createdAt: string
   voice: { name: string } | null
@@ -710,6 +711,10 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
   const monthlyPublishedCount = episodes.filter(e =>
     e.status === 'published' && new Date(e.createdAt) >= startOfMonth
   ).length
+  const CHARACTER_LIMIT = 150_000
+  const monthlyCharCount = episodes
+    .filter(e => new Date(e.createdAt) >= startOfMonth && e.characterCount != null)
+    .reduce((sum, e) => sum + (e.characterCount ?? 0), 0)
 
   // ── Sidebar nav item ──────────────────────────────────────────────────────────
 
@@ -797,15 +802,15 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
 
         {/* Bottom: usage + sign out */}
         <div className="mt-auto px-6 pt-5 border-t border-white/10">
-          <div className="text-[10px] text-white/35 font-[family-name:var(--font-dm-mono)] mb-1.5">Monthly Episodes</div>
+          <div className="text-[10px] text-white/35 font-[family-name:var(--font-dm-mono)] mb-1.5">Monthly Characters</div>
           <div className="h-[3px] bg-white/10 rounded-full overflow-hidden mb-1">
             <div
               className="h-full bg-[var(--accent)] rounded-full"
-              style={{ width: `${Math.min(100, (monthlyPublishedCount / 50) * 100)}%` }}
+              style={{ width: `${Math.min(100, (monthlyCharCount / CHARACTER_LIMIT) * 100)}%` }}
             />
           </div>
           <div className="text-[10px] text-white/40 font-[family-name:var(--font-dm-mono)] mb-3">
-            {monthlyPublishedCount} / 50 used
+            {monthlyCharCount.toLocaleString()} / {CHARACTER_LIMIT.toLocaleString()} characters
           </div>
           <button
             onClick={async () => { await supabase.auth.signOut(); router.replace('/login') }}
