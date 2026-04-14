@@ -115,7 +115,7 @@ router.patch('/:id/approve', async (req, res) => {
         title: episode.title,
         description: episode.description || '',
         audioUrl: episode.audioUrl,
-        pubdate: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+        pubdate: new Date().toISOString(),
       }
     );
 
