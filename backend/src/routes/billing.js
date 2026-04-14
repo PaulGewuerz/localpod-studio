@@ -19,6 +19,7 @@ router.post('/create-checkout-session', async (req, res) => {
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       success_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/studio?checkout=success`,
       cancel_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/onboarding`,
     });
