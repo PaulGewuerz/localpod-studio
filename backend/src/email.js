@@ -18,7 +18,6 @@ async function sendWelcomeEmail({ to, showName }) {
         </p>
         <p style="color:#555;margin-bottom:24px">
           Your podcast will appear on Apple Podcasts, Spotify, and all major apps within 72 hours.
-          We'll notify you once it's live across all platforms.
         </p>
         <a href="${STUDIO_URL}/studio"
            style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
