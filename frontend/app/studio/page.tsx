@@ -1183,7 +1183,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
             <div className="max-w-lg">
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Current Plan</div>
-                <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Studio — $99/mo</div>
+                <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Studio — $149/mo</div>
                 <div className="text-[13px] text-[var(--ink-light)]">Unlimited episodes · RSS distribution · Priority support</div>
               </div>
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
