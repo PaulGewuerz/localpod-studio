@@ -65,6 +65,19 @@ router.post('/', async (req, res) => {
     console.log('[TTS normalize] first 200 chars:', processedText.slice(0, 200));
   }
 
+  // Enforce monthly character limit
+  const CHARACTER_LIMIT = 150_000;
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const usage = await prisma.episode.aggregate({
+    where: { show: { organizationId: org.id }, createdAt: { gte: startOfMonth } },
+    _sum: { characterCount: true },
+  });
+  const usedChars = usage._sum.characterCount ?? 0;
+  if (usedChars + processedText.length > CHARACTER_LIMIT) {
+    return res.status(402).json({ error: 'character_limit_exceeded' });
+  }
+
   // Call ElevenLabs with-timestamps endpoint
   let audioBuffer;
   let paragraphMeta = null;

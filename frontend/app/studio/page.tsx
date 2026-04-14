@@ -355,6 +355,7 @@ function StudioInner() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [newEpStage, setNewEpStage] = useState<NewEpStage>('form')
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [limitExceeded, setLimitExceeded] = useState(false)
   const [processingStep, setProcessingStep] = useState(0) // 0-3
   const [episodeId, setEpisodeId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -503,6 +504,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
     if (!voice) return
 
     setGenerateError(null)
+    setLimitExceeded(false)
     setNewEpStage('processing')
     setProcessingStep(0)
 
@@ -526,6 +528,12 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
       clearTimeout(stepTimer1)
       clearTimeout(stepTimer2)
 
+      if (genRes.status === 402) {
+        setLimitExceeded(true)
+        setNewEpStage('form')
+        return
+      }
+
       if (!genRes.ok) {
         const d = await genRes.json().catch(() => ({}))
         throw new Error(d.error || `Generate failed (${genRes.status})`)
@@ -541,6 +549,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
       clearTimeout(stepTimer1)
       clearTimeout(stepTimer2)
       setGenerateError(err instanceof Error ? err.message : 'Something went wrong.')
+      setLimitExceeded(false)
       setNewEpStage('form')
     }
   }
@@ -1091,6 +1100,12 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
                     </div>
 
 
+                    {limitExceeded && (
+                      <p className="text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)] mb-4">
+                        You've reached your 150,000 character limit for this month.{' '}
+                        <a href="mailto:paul@localpod.co" className="underline hover:opacity-70">Contact us to upgrade.</a>
+                      </p>
+                    )}
                     {generateError && (
                       <p className="text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)] mb-4">{generateError}</p>
                     )}
