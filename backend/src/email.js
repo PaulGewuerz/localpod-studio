@@ -12,9 +12,13 @@ async function sendWelcomeEmail({ to, showName }) {
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
         <h1 style="font-size:22px;font-weight:600;margin-bottom:8px">You're all set.</h1>
-        <p style="color:#555;margin-bottom:24px">
+        <p style="color:#555;margin-bottom:16px">
           <strong>${showName}</strong> is now active on LocalPod Studio.
           You can start generating and publishing podcast episodes right away.
+        </p>
+        <p style="color:#555;margin-bottom:24px">
+          Your podcast will appear on Apple Podcasts, Spotify, and all major apps within 72 hours.
+          We'll notify you once it's live across all platforms.
         </p>
         <a href="${STUDIO_URL}/studio"
            style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
