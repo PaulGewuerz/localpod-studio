@@ -134,18 +134,23 @@
       font-size: 18px;
       font-weight: 300;
       color: var(--text);
-      max-width: 480px;
+      max-width: 560px;
       text-align: center;
       line-height: 1.65;
       margin-bottom: 72px;
     }
 
-    /* ── PRICING CARD ── */
-    .pricing-wrap {
+    /* ── PRICING GRID ── */
+    .pricing-grid {
       width: 100%;
-      max-width: 480px;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
     }
 
+    /* ── PRICING CARD ── */
     .pricing-card {
       background: var(--navy-card);
       border: 1px solid rgba(45,212,191,0.25);
@@ -163,6 +168,17 @@
       background: linear-gradient(90deg, transparent, rgba(45,212,191,0.5), transparent);
     }
 
+    .pricing-card.popular {
+      border-color: rgba(45,212,191,0.5);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
     .plan-badge {
       display: inline-block;
       background: rgba(45,212,191,0.1);
@@ -174,7 +190,18 @@
       text-transform: uppercase;
       padding: 4px 12px;
       border-radius: 100px;
-      margin-bottom: 24px;
+    }
+
+    .popular-badge {
+      display: inline-block;
+      background: var(--teal);
+      color: var(--navy);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 100px;
     }
 
     .plan-name {
@@ -276,12 +303,37 @@
       box-shadow: 0 16px 40px rgba(45,212,191,0.25);
     }
 
+    .btn-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      color: var(--white);
+      padding: 16px 32px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--teal);
+      color: var(--teal);
+      transform: translateY(-2px);
+    }
+
     /* ── ENTERPRISE ── */
     .enterprise-note {
       margin-top: 24px;
       text-align: center;
       font-size: 14px;
       color: var(--muted);
+      grid-column: 1 / -1;
     }
 
     .enterprise-note a {
@@ -310,7 +362,9 @@
       nav { padding: 16px 24px; }
       .nav-links { display: none; }
       .page-content { padding: 120px 24px 80px; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
       .pricing-card { padding: 32px 24px; }
+      .enterprise-note { grid-column: 1; }
       footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
     }
   </style>
@@ -335,9 +389,14 @@
   <h1 class="page-headline">Simple, transparent pricing.</h1>
   <p class="page-sub">Everything you need to turn your newsroom into a podcast network — no hidden fees, no per-episode charges.</p>
 
-  <div class="pricing-wrap">
-    <div class="pricing-card">
-      <div class="plan-badge">Publisher</div>
+  <div class="pricing-grid">
+
+    <!-- PUBLISHER -->
+    <div class="pricing-card popular">
+      <div class="card-header">
+        <div class="plan-badge">Publisher</div>
+        <div class="popular-badge">Most Popular</div>
+      </div>
       <div class="plan-name">LocalPod Studio</div>
       <div class="plan-price">
         <span class="price-amount">$149</span>
@@ -379,14 +438,6 @@
           <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
           Download analytics and listener stats
         </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Custom pronunciation dictionary
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Priority support
-        </li>
       </ul>
 
       <a href="https://app.localpod.co" class="btn-primary">
@@ -395,9 +446,88 @@
       </a>
     </div>
 
+    <!-- NETWORK -->
+    <div class="pricing-card">
+      <div class="card-header">
+        <div class="plan-badge">Network</div>
+      </div>
+      <div class="plan-name">LocalPod Studio</div>
+      <div class="plan-price">
+        <span class="price-amount">$349</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <p class="plan-desc">For regional media groups and publishers running multiple shows.</p>
+
+      <div class="features-label">What's included</div>
+      <ul class="features-list">
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          500,000 AI-narrated characters per month
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Up to 5 podcasts
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Unlimited episodes per month
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Standard audio uploads (interviews, recordings)
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Distribution to Apple Podcasts, Spotify, and all major apps
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Custom podcast intro with music branding per show
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Professional AI narration voices
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Episode scheduling and draft management
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Download analytics and listener stats
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Custom pronunciation dictionary
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Monthly check-in call with the founder
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Early access to new features
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Priority support
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Dedicated onboarding call
+        </li>
+      </ul>
+
+      <a href="mailto:paul@localpod.co" class="btn-secondary">
+        Contact Us
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    </div>
+
     <p class="enterprise-note">
-      Running a network or multiple publications? <a href="mailto:paul@localpod.co">Contact us</a> about enterprise pricing.
+      Need more? <a href="mailto:paul@localpod.co">Contact us</a> about enterprise pricing.
     </p>
+
   </div>
 </main>
 
