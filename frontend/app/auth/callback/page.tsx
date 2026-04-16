@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -8,42 +8,44 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export default function AuthCallbackPage() {
   const router = useRouter()
+  const [debugInfo, setDebugInfo] = useState<string>('Starting…')
 
   useEffect(() => {
     async function handleSession(session: import('@supabase/supabase-js').Session) {
+      setDebugInfo('Session found, checking /me…')
       try {
         const res = await fetch(`${API_URL}/me`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
-        if (!res.ok) { router.replace('/onboarding'); return }
+        if (!res.ok) { setDebugInfo('/me returned ' + res.status + ', going to onboarding'); router.replace('/onboarding'); return }
         const { subscription } = await res.json()
-        if (!subscription?.stripeCustomerId) { router.replace('/onboarding'); return }
-      } catch {
-        router.replace('/onboarding'); return
+        if (!subscription?.stripeCustomerId) { setDebugInfo('No subscription, going to onboarding'); router.replace('/onboarding'); return }
+      } catch (e) {
+        setDebugInfo('/me fetch error: ' + String(e)); router.replace('/onboarding'); return
       }
       router.replace('/studio')
     }
 
     async function handleCallback() {
-      // Give Supabase a moment to process the code/hash from the URL
+      const code = new URLSearchParams(window.location.search).get('code')
+      const hash = window.location.hash
+      setDebugInfo(`code=${!!code} hash=${!!hash}`)
+
+      if (code) {
+        setDebugInfo('Exchanging code for session…')
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        setDebugInfo(`exchangeCodeForSession: session=${!!data?.session} error=${error?.message ?? 'none'}`)
+        if (error || !data.session) return
+        await handleSession(data.session)
+        return
+      }
+
+      setDebugInfo('No code in URL, checking getSession…')
       const { data: { session } } = await supabase.auth.getSession()
+      setDebugInfo(`getSession: session=${!!session}`)
       if (session) { await handleSession(session); return }
 
-      // Listen for the session to be established (PKCE exchange in progress)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          subscription.unsubscribe()
-          await handleSession(session)
-        }
-      })
-
-      // Timeout fallback — if no session after 5s, send to login
-      setTimeout(() => {
-        subscription.unsubscribe()
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) router.replace('/login')
-        })
-      }, 5000)
+      setDebugInfo('No session found — check Supabase redirect URL config')
     }
 
     handleCallback()
@@ -51,7 +53,10 @@ export default function AuthCallbackPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <p className="text-gray-500">Signing you in…</p>
+      <div className="text-center">
+        <p className="text-gray-500 mb-2">Signing you in…</p>
+        <p className="text-xs text-gray-400 font-mono">{debugInfo}</p>
+      </div>
     </main>
   )
 }
