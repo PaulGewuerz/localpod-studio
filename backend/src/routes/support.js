@@ -9,10 +9,12 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'name, email, and message are required' });
   }
 
-  sendSMS(`LocalPod support message from ${name} (${email}):\n${message}`)
-    .catch(err => console.error('SMS alert failed:', err.message));
-
-  res.json({ ok: true });
+  try {
+    await sendSMS(`LocalPod support message from ${name} (${email}):\n${message}`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
