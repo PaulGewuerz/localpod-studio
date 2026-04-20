@@ -3,6 +3,7 @@ const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
 const { sendWelcomeEmail } = require('../email');
+const { sendSMS } = require('../notify');
 const { getHostingAdapter } = require('../adapters/hosting');
 
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -83,6 +84,10 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
               to: obj.customer_email,
               showName: show?.name ?? user.organization.name,
             }).catch(err => console.error('Welcome email failed:', err.message));
+
+            // Alert owner
+            sendSMS(`New LocalPod subscriber: ${obj.customer_email} (${show?.name ?? user.organization.name})`)
+              .catch(err => console.error('SMS alert failed:', err.message));
           }
         }
         break;
