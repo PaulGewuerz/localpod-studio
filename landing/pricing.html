@@ -144,9 +144,9 @@
     /* ── PRICING GRID ── */
     .pricing-grid {
       width: 100%;
-      max-width: 960px;
+      max-width: 520px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 24px;
       align-items: start;
     }
@@ -334,7 +334,6 @@
       text-align: center;
       font-size: 14px;
       color: var(--muted);
-      grid-column: 1 / -1;
     }
 
     .enterprise-note a {
@@ -363,9 +362,7 @@
       nav { padding: 16px 24px; }
       .nav-links { display: none; }
       .page-content { padding: 120px 24px 80px; }
-      .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
       .pricing-card { padding: 32px 24px; }
-      .enterprise-note { grid-column: 1; }
       footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
     }
   </style>
@@ -396,11 +393,10 @@
     <div class="pricing-card popular">
       <div class="card-header">
         <div class="plan-badge">Publisher</div>
-        <div class="popular-badge">Most Popular</div>
       </div>
       <div class="plan-name">LocalPod Studio</div>
       <div class="plan-price">
-        <span class="price-amount">$149</span>
+        <span class="price-amount">$129</span>
         <span class="price-period">/ month</span>
       </div>
       <p class="plan-desc">Everything a local newsroom needs to launch and grow a podcast — with no technical overhead.</p>
@@ -443,52 +439,6 @@
 
       <a href="https://app.localpod.co" class="btn-primary">
         Get Started
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
-      </a>
-    </div>
-
-    <!-- NETWORK -->
-    <div class="pricing-card">
-      <div class="card-header">
-        <div class="plan-badge">Network</div>
-      </div>
-      <div class="plan-name">LocalPod Studio</div>
-      <div class="plan-price">
-        <span class="price-amount">$349</span>
-        <span class="price-period">/ month</span>
-      </div>
-      <p class="plan-desc">For regional media groups and publishers running multiple shows.</p>
-
-      <div class="features-label">Everything in Publisher, plus:</div>
-      <ul class="features-list">
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          500,000 AI-narrated characters per month
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Up to 5 podcasts
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Monthly check-in call
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Early access to new features
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Priority support
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Dedicated onboarding call
-        </li>
-      </ul>
-
-      <a href="mailto:paul@localpod.co" class="btn-secondary">
-        Contact Us
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
       </a>
     </div>
