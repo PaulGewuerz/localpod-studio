@@ -66,6 +66,7 @@ model Episode {
   publishedUrl       String?
   megaphoneEpisodeId String?
   characterCount     Int?
+  adMarkers          String?   // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
   scheduledAt        DateTime?
   createdAt          DateTime  @default(now())
   showId             String

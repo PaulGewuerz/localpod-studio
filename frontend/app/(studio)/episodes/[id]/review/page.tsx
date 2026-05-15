@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import AdMarkersPanel from './AdMarkersPanel'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -13,6 +14,12 @@ interface ParagraphMeta {
   timeEnd: number
 }
 
+interface AdMarkers {
+  preRoll: boolean
+  postRoll: boolean
+  midRoll: number[]
+}
+
 interface Episode {
   id: string
   title: string
@@ -21,6 +28,7 @@ interface Episode {
   scriptText: string | null
   paragraphMeta: string | null
   description: string | null
+  adMarkers: string | null
   megaphoneEpisodeId: string | null
   createdAt: string
   voice: { name: string } | null
@@ -475,6 +483,15 @@ export default function EpisodeReviewPage() {
             )}
           </div>
         )}
+
+        {/* Ad Placements */}
+        <AdMarkersPanel
+          audioUrl={episode.audioUrl}
+          episodeId={episode.id}
+          isPublished={episode.status === 'published'}
+          initialMarkers={episode.adMarkers ? JSON.parse(episode.adMarkers) as AdMarkers : null}
+          getToken={getToken}
+        />
 
         {/* Actions */}
         <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5 flex flex-col gap-4">

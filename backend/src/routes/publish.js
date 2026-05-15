@@ -30,6 +30,7 @@ router.post('/', async (req, res) => {
 
   try {
     const adapter = getHostingAdapter();
+    const adMarkers = episode.adMarkers ? JSON.parse(episode.adMarkers) : null;
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
@@ -37,6 +38,7 @@ router.post('/', async (req, res) => {
         description: description || episode.description || '',
         audioUrl: episode.audioUrl,
         pubdate: pubdate || new Date().toISOString(),
+        adMarkers,
       }
     );
 

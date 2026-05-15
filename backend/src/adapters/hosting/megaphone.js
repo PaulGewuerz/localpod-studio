@@ -145,17 +145,23 @@ class MegaphoneAdapter {
    * @param {{ title: string, description?: string, audioUrl: string, pubdate?: string }} episode
    * @returns {{ id: string, url: string }}
    */
-  async publishEpisode(podcastId, { title, description, audioUrl, pubdate }) {
+  async publishEpisode(podcastId, { title, description, audioUrl, pubdate, adMarkers }) {
+    const body = {
+      title,
+      summary: description || '',
+      backgroundAudioFileUrl: audioUrl,
+      pubdate: pubdate || new Date().toISOString(),
+      draft: false,
+    };
+    if (adMarkers) {
+      body.preCount = adMarkers.preRoll ? 1 : 0;
+      body.postCount = adMarkers.postRoll ? 1 : 0;
+      if (adMarkers.midRoll?.length) body.insertionPoints = adMarkers.midRoll;
+    }
     const data = await this.#request(
       'POST',
       `${this.#podcastPath(podcastId)}/episodes`,
-      {
-        title,
-        summary: description || '',
-        backgroundAudioFileUrl: audioUrl,
-        pubdate: pubdate || new Date().toISOString(),
-        draft: false,
-      }
+      body
     );
     const playerUrl = data.uid ? `https://playlist.megaphone.fm?e=${data.uid}` : null;
     return { id: data.id, url: playerUrl };
@@ -200,11 +206,15 @@ class MegaphoneAdapter {
    * @param {{ title?: string, description?: string }} updates
    */
   async updateEpisode(podcastId, episodeId, updates) {
-    return this.#request(
-      'PUT',
-      `${this.#podcastPath(podcastId)}/episodes/${episodeId}`,
-      { title: updates.title, summary: updates.description }
-    );
+    const body = {};
+    if (updates.title !== undefined)       body.title = updates.title;
+    if (updates.description !== undefined) body.summary = updates.description;
+    if (updates.adMarkers !== undefined) {
+      body.preCount = updates.adMarkers.preRoll ? 1 : 0;
+      body.postCount = updates.adMarkers.postRoll ? 1 : 0;
+      body.insertionPoints = updates.adMarkers.midRoll ?? [];
+    }
+    return this.#request('PUT', `${this.#podcastPath(podcastId)}/episodes/${episodeId}`, body);
   }
 }
 

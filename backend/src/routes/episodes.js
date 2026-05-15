@@ -109,6 +109,7 @@ router.patch('/:id/approve', async (req, res) => {
 
   try {
     const adapter = getHostingAdapter();
+    const adMarkers = episode.adMarkers ? JSON.parse(episode.adMarkers) : null;
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
@@ -116,6 +117,7 @@ router.patch('/:id/approve', async (req, res) => {
         description: episode.description || '',
         audioUrl: episode.audioUrl,
         pubdate: new Date().toISOString(),
+        adMarkers,
       }
     );
 
@@ -372,6 +374,46 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
   });
 
   res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs });
+});
+
+// PATCH /episodes/:id/ad-markers — save ad placement config; syncs to Megaphone if already published
+router.patch('/:id/ad-markers', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+  const { preRoll, postRoll, midRoll } = req.body;
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+
+  const markers = {
+    preRoll: !!preRoll,
+    postRoll: !!postRoll,
+    midRoll: Array.isArray(midRoll) ? midRoll.map(Number).filter(n => !isNaN(n)) : [],
+  };
+
+  await prisma.episode.update({ where: { id }, data: { adMarkers: JSON.stringify(markers) } });
+
+  // If published, sync to Megaphone immediately
+  if (episode.megaphoneEpisodeId) {
+    const megaphoneShowId = req.user.organization.megaphoneShowId;
+    if (megaphoneShowId) {
+      try {
+        const adapter = getHostingAdapter();
+        await adapter.updateEpisode(megaphoneShowId, episode.megaphoneEpisodeId, { adMarkers: markers });
+      } catch (err) {
+        console.error('Megaphone ad marker sync error:', err.message);
+        return res.json({ episodeId: id, warning: `Saved locally but Megaphone sync failed: ${err.message}` });
+      }
+    }
+  }
+
+  res.json({ episodeId: id });
 });
 
 module.exports = router;
