@@ -43,7 +43,7 @@ type NewEpStage = 'form' | 'processing'
 const NAV_TITLES: Record<NavKey, string> = {
   dashboard: 'Dashboard', new: 'New Episode', episodes: 'Episodes',
   analytics: 'Analytics', billing: 'Billing', shows: 'Shows',
-  dist: 'Distribution', settings: 'Settings', ads: 'Dynamic Ads',
+  dist: 'Distribution', settings: 'Settings', ads: 'Ad Manager',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -801,7 +801,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
           </div>
           <NavItem navKey="shows"     icon="◈" label="Shows" />
           <NavItem navKey="analytics" icon="◌" label="Analytics" />
-          <NavItem navKey="ads"       icon="◧" label="Dynamic Ads" />
+          <NavItem navKey="ads"       icon="◧" label="Ad Manager" />
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Settings
