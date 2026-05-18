@@ -22,6 +22,8 @@ interface AdCampaign {
   type: string
   status: string
   audioUrl: string | null
+  startDate: string | null
+  endDate: string | null
 }
 
 interface Props {
@@ -99,13 +101,42 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   }, [audioUrl])
 
   useEffect(() => {
-    getToken().then(token =>
-      fetch(`${API_URL}/ad-campaigns`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.ok ? r.json() : [])
-        .then((all: AdCampaign[]) => setCampaigns(all.filter(c => c.status === 'active' && c.audioUrl)))
-        .catch(() => {})
-    )
-  }, [getToken])
+    async function load() {
+      try {
+        const token = await getToken()
+        const [campRes, meRes] = await Promise.all([
+          fetch(`${API_URL}/ad-campaigns`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+        const all: AdCampaign[] = campRes.ok ? await campRes.json() : []
+        const active = all.filter(c => c.status === 'active' && c.audioUrl)
+        setCampaigns(active)
+
+        // If no explicit assignments saved, pre-check campaigns matching show defaults
+        if (initialAssignments.length === 0 && meRes.ok) {
+          const me = await meRes.json()
+          const defaults = me.show?.adMarkerDefaults ? JSON.parse(me.show.adMarkerDefaults) : null
+          if (defaults) {
+            const auto = new Map<string, AdAssignment>()
+            const now = Date.now()
+            for (const c of active) {
+              const inWindow =
+                (!c.startDate || new Date(c.startDate).getTime() <= now) &&
+                (!c.endDate || new Date(c.endDate).getTime() >= now)
+              if (!inWindow) continue
+              if (c.type === 'pre-roll' && defaults.preRoll) {
+                auto.set(c.id, { campaignId: c.id, type: 'pre-roll' })
+              } else if (c.type === 'post-roll' && defaults.postRoll) {
+                auto.set(c.id, { campaignId: c.id, type: 'post-roll' })
+              }
+            }
+            if (auto.size > 0) setAssignments(auto)
+          }
+        }
+      } catch { /* silent */ }
+    }
+    load()
+  }, [getToken, initialAssignments.length])
 
   function handlePlayPause() { wsRef.current?.playPause() }
 
