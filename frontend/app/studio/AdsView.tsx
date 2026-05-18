@@ -102,12 +102,14 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
 
   // AI audio generation
   const [voices, setVoices] = useState<Voice[]>([])
-  const [showGenerate, setShowGenerate] = useState(false)
+  const [audioMode, setAudioMode] = useState<'url' | 'generate' | 'upload'>('url')
   const [adCopy, setAdCopy] = useState('')
   const [genVoiceId, setGenVoiceId] = useState('')
   const [generating, setGenerating] = useState(false)
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadAll() {
@@ -172,18 +174,19 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
 
   // ── Campaign handlers ──────────────────────────────────────────────────────
 
-  function resetGenerate() {
-    setShowGenerate(false)
+  function resetAudio() {
+    setAudioMode('url')
     setAdCopy('')
     setGeneratedUrl(null)
     setGenError(null)
+    setUploadError(null)
   }
 
   function openNew() {
     setForm({ ...EMPTY_FORM })
     setEditId(null)
     setCampError(null)
-    resetGenerate()
+    resetAudio()
     setShowForm(true)
   }
 
@@ -199,7 +202,7 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
     })
     setEditId(c.id)
     setCampError(null)
-    resetGenerate()
+    resetAudio()
     setShowForm(true)
   }
 
@@ -229,7 +232,28 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
   function useGeneratedAudio() {
     if (!generatedUrl) return
     setForm(f => ({ ...f, audioUrl: generatedUrl }))
-    resetGenerate()
+    resetAudio()
+  }
+
+  async function handleUpload(file: File) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/ad-campaigns/upload-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'audio/mpeg', Authorization: `Bearer ${token}` },
+        body: file,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`)
+      setForm(f => ({ ...f, audioUrl: data.audioUrl }))
+      setAudioMode('url')
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function saveCampaign() {
@@ -481,33 +505,60 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
                     {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </div>
-                {/* Audio URL + AI generation */}
+                {/* Ad Audio */}
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.05em]">Ad Audio</label>
-                    {voices.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => { setShowGenerate(v => !v); setGeneratedUrl(null); setGenError(null) }}
-                        className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] hover:opacity-75 transition-opacity"
-                      >
-                        {showGenerate ? 'Cancel' : '✦ Generate with AI'}
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => setAudioMode('upload')}
+                        className={`text-[11px] font-[family-name:var(--font-dm-mono)] transition-opacity ${audioMode === 'upload' ? 'text-[var(--ink)] font-semibold' : 'text-[var(--ink-faint)] hover:text-[var(--ink)]'}`}>
+                        ↑ Upload file
                       </button>
-                    )}
+                      {voices.length > 0 && (
+                        <button type="button" onClick={() => setAudioMode(audioMode === 'generate' ? 'url' : 'generate')}
+                          className={`text-[11px] font-[family-name:var(--font-dm-mono)] transition-opacity ${audioMode === 'generate' ? 'text-[var(--ink)] font-semibold' : 'text-[var(--accent)] hover:opacity-75'}`}>
+                          ✦ Generate with AI
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Manual URL input */}
-                  {!showGenerate && (
+                  {/* URL input (default) */}
+                  {audioMode === 'url' && (
                     <input
                       value={form.audioUrl}
                       onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
-                      placeholder="https://… (paste audio URL, or generate with AI above)"
+                      placeholder="https://… or use Upload / Generate above"
                       className="border border-[var(--rule)] rounded-[2px] px-3 py-2 text-[13px] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--ink)] transition-colors"
                     />
                   )}
 
+                  {/* Upload panel */}
+                  {audioMode === 'upload' && (
+                    <div className="border border-[var(--rule)] rounded-[2px] p-4 bg-[var(--bg)] space-y-3">
+                      <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--rule)] rounded-[2px] p-6 cursor-pointer hover:border-[var(--ink-faint)] transition-colors">
+                        <span className="text-[13px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                          {uploading ? 'Uploading…' : 'Click to choose an audio file'}
+                        </span>
+                        <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">MP3, WAV, M4A, AAC, OGG — up to 50 MB</span>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          disabled={uploading}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }}
+                        />
+                      </label>
+                      {uploadError && <p className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{uploadError}</p>}
+                      <button type="button" onClick={() => setAudioMode('url')}
+                        className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] hover:text-[var(--ink)]">
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
                   {/* AI generation panel */}
-                  {showGenerate && (
+                  {audioMode === 'generate' && (
                     <div className="border border-[var(--rule)] rounded-[2px] p-4 bg-[var(--bg)] space-y-3">
                       <textarea
                         value={adCopy}
@@ -537,24 +588,18 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
                           ) : 'Generate →'}
                         </button>
                       </div>
-                      {genError && (
-                        <p className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{genError}</p>
-                      )}
+                      {genError && <p className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{genError}</p>}
                       {generatedUrl && (
                         <div className="space-y-2 pt-1 border-t border-[var(--rule)]">
                           <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)]">Preview</div>
                           <audio controls src={generatedUrl} className="w-full" />
                           <div className="flex items-center gap-3">
-                            <button
-                              onClick={useGeneratedAudio}
-                              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--green)] hover:opacity-90 rounded-[2px] transition-opacity"
-                            >
+                            <button onClick={useGeneratedAudio}
+                              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--green)] hover:opacity-90 rounded-[2px] transition-opacity">
                               Use this audio →
                             </button>
-                            <button
-                              onClick={() => { setGeneratedUrl(null); setAdCopy('') }}
-                              className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] hover:text-[var(--ink)]"
-                            >
+                            <button onClick={() => { setGeneratedUrl(null); setAdCopy('') }}
+                              className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] hover:text-[var(--ink)]">
                               Regenerate
                             </button>
                           </div>
@@ -563,8 +608,8 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
                     </div>
                   )}
 
-                  {/* Show current URL if set */}
-                  {form.audioUrl && !showGenerate && (
+                  {/* Preview current audio */}
+                  {form.audioUrl && audioMode === 'url' && (
                     <audio controls src={form.audioUrl} className="w-full mt-1" />
                   )}
                 </div>

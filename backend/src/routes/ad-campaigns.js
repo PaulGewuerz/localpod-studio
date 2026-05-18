@@ -129,4 +129,39 @@ router.post('/generate-audio', async (req, res) => {
   res.json({ audioUrl: publicUrl });
 });
 
+// POST /ad-campaigns/upload-audio — accept a raw audio file and return a hosted URL
+const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave',
+  'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/ogg', 'audio/webm', 'application/octet-stream'];
+
+router.post('/upload-audio',
+  express.raw({ type: AUDIO_MIME_TYPES, limit: '50mb' }),
+  async (req, res) => {
+    const orgId = req.user.organization.id;
+
+    if (!req.body || !req.body.length) {
+      return res.status(400).json({ error: 'No audio file received' });
+    }
+
+    const contentType = req.headers['content-type'] || 'audio/mpeg';
+    const ext = contentType.includes('wav') ? 'wav'
+              : contentType.includes('ogg') ? 'ogg'
+              : contentType.includes('aac') ? 'aac'
+              : contentType.includes('mp4') || contentType.includes('m4a') ? 'm4a'
+              : 'mp3';
+
+    const storagePath = `ads/${orgId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('audio')
+      .upload(storagePath, req.body, { contentType, upsert: false });
+
+    if (uploadError) {
+      console.error('Ad audio upload error:', uploadError.message);
+      return res.status(500).json({ error: 'Failed to store audio' });
+    }
+
+    const { data: { publicUrl } } = supabaseAdmin.storage.from('audio').getPublicUrl(storagePath);
+    res.json({ audioUrl: publicUrl });
+  }
+);
+
 module.exports = router;
