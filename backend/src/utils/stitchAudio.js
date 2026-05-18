@@ -39,7 +39,11 @@ async function concatSegments(inputPaths, outputPath) {
   const listContent = inputPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n');
   await fs.writeFile(listPath, listContent, 'utf8');
   try {
-    await execAsync(`ffmpeg -y -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`);
+    // Re-encode to normalise sample rate, channels, and frame boundaries across segments.
+    // -c copy can produce malformed output when inputs have different encodings.
+    await execAsync(
+      `ffmpeg -y -f concat -safe 0 -i "${listPath}" -acodec libmp3lame -ar 44100 -ab 128k -ac 2 "${outputPath}"`
+    );
   } finally {
     await fs.unlink(listPath).catch(() => {});
   }
