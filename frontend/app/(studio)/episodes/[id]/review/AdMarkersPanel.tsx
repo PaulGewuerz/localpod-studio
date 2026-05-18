@@ -29,6 +29,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wsRef = useRef<any>(null)
   const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [waveReady, setWaveReady] = useState(false)
   const [markers, setMarkers] = useState<AdMarkers>(
     initialMarkers ?? { preRoll: false, postRoll: false, midRoll: [] }
@@ -49,32 +51,36 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       ws = WaveSurfer.create({
         container: containerRef.current,
         url: audioUrl,
-        waveColor: 'var(--rule)',
-        progressColor: 'var(--ink-faint)',
+        waveColor: '#d1d5db',
+        progressColor: '#374151',
         height: 72,
         barWidth: 2,
         barGap: 1,
         barRadius: 2,
-        interact: false,
       })
       ws.on('ready', () => {
-        setDuration(ws!.getDuration())
+        setDuration(ws.getDuration())
         setWaveReady(true)
       })
+      ws.on('timeupdate', (t: number) => setCurrentTime(t))
+      ws.on('play', () => setIsPlaying(true))
+      ws.on('pause', () => setIsPlaying(false))
+      ws.on('finish', () => setIsPlaying(false))
       wsRef.current = ws
     })
 
     return () => { ws?.destroy() }
   }, [audioUrl])
 
-  function handleWaveformClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!duration) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const pct = (e.clientX - rect.left) / rect.width
-    const time = Math.round(pct * duration * 10) / 10
+  function handlePlayPause() {
+    wsRef.current?.playPause()
+  }
+
+  function handleMarkHere() {
+    const t = Math.round(currentTime * 10) / 10
     setMarkers(prev => {
-      if (prev.midRoll.includes(time)) return prev
-      return { ...prev, midRoll: [...prev.midRoll, time].sort((a, b) => a - b) }
+      if (prev.midRoll.includes(t)) return prev
+      return { ...prev, midRoll: [...prev.midRoll, t].sort((a, b) => a - b) }
     })
     setSaved(false)
   }
@@ -130,27 +136,52 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         ))}
       </div>
 
-      {/* Mid-roll waveform */}
+      {/* Mid-roll waveform + player */}
       <div>
         <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-2">
-          Mid-roll — {audioUrl ? (waveReady ? 'click waveform to place markers' : 'loading waveform…') : 'generate audio first'}
+          Mid-roll — {audioUrl ? (waveReady ? 'play to find your spot, then mark it' : 'loading waveform…') : 'generate audio first'}
         </div>
         {audioUrl && (
-          <div
-            className="relative rounded-[2px] overflow-hidden"
-            style={{ cursor: waveReady ? 'crosshair' : 'default' }}
-            onClick={waveReady ? handleWaveformClick : undefined}
-          >
-            <div ref={containerRef} />
-            {/* Marker lines */}
-            {waveReady && markers.midRoll.map(t => (
-              <div
-                key={t}
-                className="absolute top-0 bottom-0 w-px bg-[var(--accent)] pointer-events-none"
-                style={{ left: `${(t / duration) * 100}%` }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="relative rounded-[2px] overflow-hidden">
+              <div ref={containerRef} />
+              {waveReady && markers.midRoll.map(t => (
+                <div
+                  key={t}
+                  className="absolute top-0 bottom-0 w-px bg-[var(--accent)] pointer-events-none"
+                  style={{ left: `${(t / duration) * 100}%` }}
+                />
+              ))}
+            </div>
+            {waveReady && (
+              <div className="flex items-center gap-3 mt-2">
+                <button
+                  onClick={handlePlayPause}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--ink)] text-white hover:bg-[#2a2825] transition-colors shrink-0"
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                      <rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/>
+                    </svg>
+                  ) : (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                      <path d="M2 1.5l7 3.5-7 3.5V1.5z"/>
+                    </svg>
+                  )}
+                </button>
+                <span className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] w-20 tabular-nums">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <button
+                  onClick={handleMarkHere}
+                  className="px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--accent)] border border-[var(--accent)] rounded-[2px] hover:bg-red-50 transition-colors"
+                >
+                  Mark here
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
