@@ -10,11 +10,26 @@ interface AdMarkers {
   midRoll: number[]
 }
 
+interface AdAssignment {
+  campaignId: string
+  type: string
+  insertAt?: number
+}
+
+interface AdCampaign {
+  id: string
+  name: string
+  type: string
+  status: string
+  audioUrl: string | null
+}
+
 interface Props {
   audioUrl: string | null
   episodeId: string
   isPublished: boolean
   initialMarkers: AdMarkers | null
+  initialAssignments: AdAssignment[]
   getToken: () => Promise<string>
 }
 
@@ -24,7 +39,7 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialMarkers, getToken }: Props) {
+export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialMarkers, initialAssignments, getToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wsRef = useRef<any>(null)
@@ -40,12 +55,25 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saveWarning, setSaveWarning] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
+  // Campaign assignments
+  const [campaigns, setCampaigns] = useState<AdCampaign[]>([])
+  const [assignments, setAssignments] = useState<AdAssignment[]>(initialAssignments)
+  const [assignSaving, setAssignSaving] = useState(false)
+  const [assignSaved, setAssignSaved] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
+  // Mid-roll insertAt inputs keyed by campaignId
+  const [insertAtInputs, setInsertAtInputs] = useState<Record<string, string>>(() => {
+    const m: Record<string, string> = {}
+    for (const a of initialAssignments) {
+      if (a.type === 'mid-roll') m[a.campaignId] = String(a.insertAt ?? '')
+    }
+    return m
+  })
+
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let ws: any = null
-
     import('wavesurfer.js').then(({ default: WaveSurfer }) => {
       if (!containerRef.current) return
       ws = WaveSurfer.create({
@@ -58,23 +86,26 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         barGap: 1,
         barRadius: 2,
       })
-      ws.on('ready', () => {
-        setDuration(ws.getDuration())
-        setWaveReady(true)
-      })
+      ws.on('ready', () => { setDuration(ws.getDuration()); setWaveReady(true) })
       ws.on('timeupdate', (t: number) => setCurrentTime(t))
       ws.on('play', () => setIsPlaying(true))
       ws.on('pause', () => setIsPlaying(false))
       ws.on('finish', () => setIsPlaying(false))
       wsRef.current = ws
     })
-
     return () => { ws?.destroy() }
   }, [audioUrl])
 
-  function handlePlayPause() {
-    wsRef.current?.playPause()
-  }
+  useEffect(() => {
+    getToken().then(token =>
+      fetch(`${API_URL}/ad-campaigns`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : [])
+        .then((all: AdCampaign[]) => setCampaigns(all.filter(c => c.status === 'active' && c.audioUrl)))
+        .catch(() => {})
+    )
+  }, [getToken])
+
+  function handlePlayPause() { wsRef.current?.playPause() }
 
   function handleMarkHere() {
     const t = Math.round(currentTime * 10) / 10
@@ -91,10 +122,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   }
 
   async function handleSave() {
-    setSaving(true)
-    setSaveError(null)
-    setSaveWarning(null)
-    setSaved(false)
+    setSaving(true); setSaveError(null); setSaveWarning(null); setSaved(false)
     try {
       const token = await getToken()
       const res = await fetch(`${API_URL}/episodes/${episodeId}/ad-markers`, {
@@ -112,6 +140,53 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       setSaving(false)
     }
   }
+
+  // ── Campaign assignment ────────────────────────────────────────────
+
+  function isAssigned(campaignId: string) {
+    return assignments.some(a => a.campaignId === campaignId)
+  }
+
+  function toggleAssignment(campaign: AdCampaign) {
+    setAssignSaved(false)
+    if (isAssigned(campaign.id)) {
+      setAssignments(prev => prev.filter(a => a.campaignId !== campaign.id))
+    } else {
+      const newA: AdAssignment = { campaignId: campaign.id, type: campaign.type }
+      if (campaign.type === 'mid-roll') newA.insertAt = Number(insertAtInputs[campaign.id]) || 0
+      setAssignments(prev => [...prev, newA])
+    }
+  }
+
+  function updateInsertAt(campaignId: string, val: string) {
+    setInsertAtInputs(prev => ({ ...prev, [campaignId]: val }))
+    setAssignments(prev => prev.map(a =>
+      a.campaignId === campaignId ? { ...a, insertAt: Number(val) || 0 } : a
+    ))
+    setAssignSaved(false)
+  }
+
+  async function handleSaveAssignments() {
+    setAssignSaving(true); setAssignError(null); setAssignSaved(false)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${episodeId}/ad-assignments`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ assignments }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`)
+      setAssignSaved(true)
+    } catch (err: unknown) {
+      setAssignError(err instanceof Error ? err.message : 'Save failed.')
+    } finally {
+      setAssignSaving(false)
+    }
+  }
+
+  const activeCampaigns = campaigns.filter(c => c.audioUrl)
+  const hasCampaigns = activeCampaigns.length > 0
 
   return (
     <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6 flex flex-col gap-4">
@@ -205,7 +280,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         </div>
       )}
 
-      {/* Save row */}
+      {/* Megaphone DAI marker save row */}
       <div className="flex items-center gap-3 pt-1 border-t border-[var(--rule)]">
         <button
           onClick={handleSave}
@@ -222,6 +297,74 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         )}
         {saveError && (
           <span className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{saveError}</span>
+        )}
+      </div>
+
+      {/* ── Sponsor Campaigns ──────────────────────────────────────────── */}
+      <div className="pt-2 border-t border-[var(--rule)]">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-3">
+          Sponsor Campaigns
+        </div>
+
+        {!hasCampaigns ? (
+          <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+            No active campaigns with audio yet.{' '}
+            <a href="/studio?nav=ads" className="underline hover:text-[var(--ink)]">Create one in Dynamic Ads →</a>
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+              Selected campaigns will be stitched into the audio when this episode publishes.
+            </p>
+            {activeCampaigns.map(c => {
+              const assigned = isAssigned(c.id)
+              return (
+                <div key={c.id} className="flex items-center gap-3 py-1.5">
+                  <input
+                    type="checkbox"
+                    id={`camp-${c.id}`}
+                    checked={assigned}
+                    onChange={() => toggleAssignment(c)}
+                    className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
+                  />
+                  <label htmlFor={`camp-${c.id}`} className="flex-1 cursor-pointer select-none">
+                    <span className="text-[13px] text-[var(--ink)]">{c.name}</span>
+                    <span className="ml-2 text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">{c.type}</span>
+                  </label>
+                  {c.type === 'mid-roll' && assigned && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">at</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={insertAtInputs[c.id] ?? ''}
+                        onChange={e => updateInsertAt(c.id, e.target.value)}
+                        placeholder="sec"
+                        className="w-20 border border-[var(--rule)] rounded-[2px] px-2 py-1 text-[12px] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--ink)] transition-colors"
+                      />
+                      <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">s</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={handleSaveAssignments}
+                disabled={assignSaving}
+                className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+              >
+                {assignSaving ? 'Saving…' : 'Save campaign assignments'}
+              </button>
+              {assignSaved && !assignSaving && (
+                <span className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Saved — will apply at next publish</span>
+              )}
+              {assignError && (
+                <span className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{assignError}</span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

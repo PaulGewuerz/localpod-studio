@@ -95,4 +95,83 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
   }
 }
 
-module.exports = { spliceSegment };
+/**
+ * Stitch publisher ad campaigns into episode audio.
+ * Pre-rolls are prepended, post-rolls are appended, mid-rolls are inserted at insertAt seconds.
+ *
+ * @param {string} episodeAudioUrl - public URL of the episode audio
+ * @param {Array<{campaignId: string, type: string, insertAt?: number}>} assignments
+ * @param {Object<string, string>} campaignAudioUrls - map of campaignId → audioUrl
+ * @returns {Buffer|null} stitched audio buffer, or null if nothing to stitch
+ */
+async function stitchCampaigns(episodeAudioUrl, assignments, campaignAudioUrls) {
+  const active = assignments.filter(a => campaignAudioUrls[a.campaignId]);
+  if (!active.length) return null;
+
+  const tmp = os.tmpdir();
+  const uid = `lp_ad_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const tempFiles = [];
+
+  try {
+    const episodePath = path.join(tmp, `${uid}_ep.mp3`);
+    await downloadToTemp(episodeAudioUrl, episodePath);
+    tempFiles.push(episodePath);
+
+    // Download each unique campaign audio
+    const campPaths = {};
+    for (const [campId, audioUrl] of Object.entries(campaignAudioUrls)) {
+      const p = path.join(tmp, `${uid}_c_${campId}.mp3`);
+      await downloadToTemp(audioUrl, p);
+      campPaths[campId] = p;
+      tempFiles.push(p);
+    }
+
+    const preRolls  = active.filter(a => a.type === 'pre-roll');
+    const midRolls  = active.filter(a => a.type === 'mid-roll').sort((a, b) => (a.insertAt || 0) - (b.insertAt || 0));
+    const postRolls = active.filter(a => a.type === 'post-roll');
+
+    const segments = [];
+    let segIdx = 0;
+
+    for (const pr of preRolls) segments.push(campPaths[pr.campaignId]);
+
+    if (midRolls.length === 0) {
+      segments.push(episodePath);
+    } else {
+      let prevTime = 0;
+      for (const mr of midRolls) {
+        const insertAt = mr.insertAt || 0;
+        if (insertAt > prevTime + 0.05) {
+          const segPath = path.join(tmp, `${uid}_seg${segIdx++}.mp3`);
+          await cutSegment(episodePath, segPath, prevTime, insertAt);
+          tempFiles.push(segPath);
+          segments.push(segPath);
+        }
+        segments.push(campPaths[mr.campaignId]);
+        prevTime = insertAt;
+      }
+      // Remaining episode after last mid-roll
+      const remainPath = path.join(tmp, `${uid}_remain.mp3`);
+      await cutSegment(episodePath, remainPath, prevTime);
+      const stat = await fs.stat(remainPath).catch(() => null);
+      if (stat && stat.size > 1000) {
+        tempFiles.push(remainPath);
+        segments.push(remainPath);
+      }
+    }
+
+    for (const po of postRolls) segments.push(campPaths[po.campaignId]);
+
+    // If the only segment is the unmodified episode, skip
+    if (segments.length === 1 && segments[0] === episodePath) return null;
+
+    const outPath = path.join(tmp, `${uid}_out.mp3`);
+    tempFiles.push(outPath);
+    await concatSegments(segments, outPath);
+    return await fs.readFile(outPath);
+  } finally {
+    await Promise.all(tempFiles.map(p => fs.unlink(p).catch(() => {})));
+  }
+}
+
+module.exports = { spliceSegment, stitchCampaigns };

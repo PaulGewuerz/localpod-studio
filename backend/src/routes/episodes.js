@@ -4,6 +4,7 @@ const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
 const { spliceSegment } = require('../utils/stitchAudio');
+const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -24,6 +25,7 @@ router.get('/', async (req, res) => {
       characterCount: true,
       megaphoneEpisodeId: true,
       adMarkers: true,
+      adAssignments: true,
       scheduledAt: true,
       createdAt: true,
       voice: { select: { name: true } },
@@ -111,12 +113,13 @@ router.patch('/:id/approve', async (req, res) => {
   try {
     const adapter = getHostingAdapter();
     const adMarkers = episode.adMarkers ? JSON.parse(episode.adMarkers) : null;
+    const audioUrl = await preparePublishAudio(episode, orgId, prisma);
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
         title: episode.title,
         description: episode.description || '',
-        audioUrl: episode.audioUrl,
+        audioUrl,
         pubdate: new Date().toISOString(),
         adMarkers,
       }
@@ -375,6 +378,31 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
   });
 
   res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs });
+});
+
+// PATCH /episodes/:id/ad-assignments — save which publisher campaigns to stitch at publish time
+router.patch('/:id/ad-assignments', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+  const { assignments } = req.body;
+
+  const episode = await prisma.episode.findUnique({ where: { id }, include: { show: true } });
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+
+  const normalized = Array.isArray(assignments)
+    ? assignments
+        .filter(a => a.campaignId && ['pre-roll', 'mid-roll', 'post-roll'].includes(a.type))
+        .map(a => ({
+          campaignId: a.campaignId,
+          type: a.type,
+          ...(a.type === 'mid-roll' ? { insertAt: Number(a.insertAt) || 0 } : {}),
+        }))
+    : [];
+
+  await prisma.episode.update({ where: { id }, data: { adAssignments: JSON.stringify(normalized) } });
+  res.json({ episodeId: id, assignments: normalized });
 });
 
 // PATCH /episodes/:id/ad-markers — save ad placement config; syncs to Megaphone if already published

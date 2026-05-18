@@ -29,6 +29,7 @@ interface Episode {
   paragraphMeta: string | null
   description: string | null
   adMarkers: string | null
+  adAssignments: string | null
   megaphoneEpisodeId: string | null
   createdAt: string
   voice: { name: string } | null
@@ -490,6 +491,7 @@ export default function EpisodeReviewPage() {
           episodeId={episode.id}
           isPublished={episode.status === 'published'}
           initialMarkers={episode.adMarkers ? JSON.parse(episode.adMarkers) as AdMarkers : null}
+          initialAssignments={episode.adAssignments ? JSON.parse(episode.adAssignments) : []}
           getToken={getToken}
         />
 

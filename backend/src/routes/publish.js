@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { preparePublishAudio } = require('../utils/preparePublishAudio');
 
 router.post('/', async (req, res) => {
   const { episodeId, title, description, pubdate } = req.body;
@@ -31,12 +32,13 @@ router.post('/', async (req, res) => {
   try {
     const adapter = getHostingAdapter();
     const adMarkers = episode.adMarkers ? JSON.parse(episode.adMarkers) : null;
+    const audioUrl = await preparePublishAudio(episode, orgId, prisma);
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
         title: title || episode.title,
         description: description || episode.description || '',
-        audioUrl: episode.audioUrl,
+        audioUrl,
         pubdate: pubdate || new Date().toISOString(),
         adMarkers,
       }

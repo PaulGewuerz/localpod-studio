@@ -17,6 +17,7 @@ interface EpisodeAd {
   title: string
   status: string
   adMarkers: string | null
+  adAssignments: string | null
 }
 
 interface Voice {
@@ -308,7 +309,7 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
             <table className="w-full border-collapse bg-white border border-[var(--rule)] rounded-[2px]">
               <thead>
                 <tr>
-                  {['Episode', 'Status', 'Ad Markers', ''].map(h => (
+                  {['Episode', 'Status', 'Ad Markers', 'Sponsor Ads', ''].map(h => (
                     <th key={h} className="text-left px-4 py-2.5 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] font-normal border-b border-[var(--rule)] bg-[var(--bg-warm)]">
                       {h}
                     </th>
@@ -318,6 +319,7 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
               <tbody>
                 {episodes.map(ep => {
                   const markers = ep.adMarkers ? JSON.parse(ep.adMarkers) as AdMarkers : null
+                  const assignCount = ep.adAssignments ? (JSON.parse(ep.adAssignments) as unknown[]).length : 0
                   return (
                     <tr key={ep.id} className="hover:bg-[var(--bg)]">
                       <td className="px-4 py-3 border-b border-[var(--rule)] text-[13px] font-medium text-[var(--ink)]">{ep.title}</td>
@@ -333,12 +335,17 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
                       <td className="px-4 py-3 border-b border-[var(--rule)]">
                         <AdMarkerBadge markers={markers} />
                       </td>
+                      <td className="px-4 py-3 border-b border-[var(--rule)] text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)]">
+                        {assignCount > 0
+                          ? <span className="text-[var(--ink)]">{assignCount} assigned</span>
+                          : '—'}
+                      </td>
                       <td className="px-4 py-3 border-b border-[var(--rule)]">
                         <a
                           href={`/episodes/${ep.id}/review`}
                           className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--accent)] font-[family-name:var(--font-dm-mono)] transition-colors"
                         >
-                          Edit markers →
+                          Edit →
                         </a>
                       </td>
                     </tr>
@@ -436,13 +443,6 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
       {/* ── CAMPAIGNS ─────────────────────────────────────────────────── */}
       {subNav === 'campaigns' && (
         <div>
-          {/* Info banner */}
-          <div className="mb-5 px-4 py-3 bg-[var(--bg-warm)] border border-[var(--rule)] rounded-[2px] text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
-            Campaigns are stored here for reference. To activate them in Megaphone's ad system, go to your{' '}
-            <a href="https://cms.megaphone.fm" target="_blank" rel="noreferrer" className="underline hover:text-[var(--ink)]">Megaphone CMS</a>{' '}
-            and configure DAI campaigns there. Megaphone v2 campaign API sync coming soon.
-          </div>
-
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-[family-name:var(--font-nunito)] font-bold text-base text-[var(--ink)]">
               {campaigns.length} Campaign{campaigns.length !== 1 ? 's' : ''}
