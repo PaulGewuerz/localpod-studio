@@ -39,6 +39,12 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+const AD_TYPES = [
+  { value: 'pre-roll', label: 'Pre' },
+  { value: 'mid-roll', label: 'Mid' },
+  { value: 'post-roll', label: 'Post' },
+]
+
 export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialMarkers, initialAssignments, getToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,20 +61,16 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saveWarning, setSaveWarning] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
-  // Campaign assignments
+  // Campaign assignments — keyed by campaignId for easy lookup
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([])
-  const [assignments, setAssignments] = useState<AdAssignment[]>(initialAssignments)
+  const [assignments, setAssignments] = useState<Map<string, AdAssignment>>(() => {
+    const m = new Map<string, AdAssignment>()
+    for (const a of initialAssignments) m.set(a.campaignId, a)
+    return m
+  })
   const [assignSaving, setAssignSaving] = useState(false)
   const [assignSaved, setAssignSaved] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
-  // Mid-roll insertAt inputs keyed by campaignId
-  const [insertAtInputs, setInsertAtInputs] = useState<Record<string, string>>(() => {
-    const m: Record<string, string> = {}
-    for (const a of initialAssignments) {
-      if (a.type === 'mid-roll') m[a.campaignId] = String(a.insertAt ?? '')
-    }
-    return m
-  })
 
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
@@ -143,27 +145,42 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
 
   // ── Campaign assignment ────────────────────────────────────────────
 
-  function isAssigned(campaignId: string) {
-    return assignments.some(a => a.campaignId === campaignId)
+  function toggleCampaign(campaign: AdCampaign) {
+    setAssignSaved(false)
+    setAssignments(prev => {
+      const next = new Map(prev)
+      if (next.has(campaign.id)) {
+        next.delete(campaign.id)
+      } else {
+        next.set(campaign.id, { campaignId: campaign.id, type: campaign.type })
+      }
+      return next
+    })
   }
 
-  function toggleAssignment(campaign: AdCampaign) {
+  function setAssignmentType(campaignId: string, type: string) {
     setAssignSaved(false)
-    if (isAssigned(campaign.id)) {
-      setAssignments(prev => prev.filter(a => a.campaignId !== campaign.id))
-    } else {
-      const newA: AdAssignment = { campaignId: campaign.id, type: campaign.type }
-      if (campaign.type === 'mid-roll') newA.insertAt = Number(insertAtInputs[campaign.id]) || 0
-      setAssignments(prev => [...prev, newA])
-    }
+    setAssignments(prev => {
+      const next = new Map(prev)
+      const existing = next.get(campaignId)
+      if (!existing) return prev
+      const updated: AdAssignment = { ...existing, type }
+      if (type !== 'mid-roll') delete updated.insertAt
+      next.set(campaignId, updated)
+      return next
+    })
   }
 
-  function updateInsertAt(campaignId: string, val: string) {
-    setInsertAtInputs(prev => ({ ...prev, [campaignId]: val }))
-    setAssignments(prev => prev.map(a =>
-      a.campaignId === campaignId ? { ...a, insertAt: Number(val) || 0 } : a
-    ))
+  function markCampaignHere(campaignId: string) {
+    const t = Math.round(currentTime * 10) / 10
     setAssignSaved(false)
+    setAssignments(prev => {
+      const next = new Map(prev)
+      const existing = next.get(campaignId)
+      if (!existing) return prev
+      next.set(campaignId, { ...existing, insertAt: t })
+      return next
+    })
   }
 
   async function handleSaveAssignments() {
@@ -173,7 +190,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       const res = await fetch(`${API_URL}/episodes/${episodeId}/ad-assignments`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ assignments }),
+        body: JSON.stringify({ assignments: [...assignments.values()] }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`)
@@ -186,7 +203,6 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   }
 
   const activeCampaigns = campaigns.filter(c => c.audioUrl)
-  const hasCampaigns = activeCampaigns.length > 0
 
   return (
     <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6 flex flex-col gap-4">
@@ -211,7 +227,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         ))}
       </div>
 
-      {/* Mid-roll waveform + player */}
+      {/* Waveform player — shared by both mid-roll markers and campaign marking */}
       <div>
         <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-2">
           Mid-roll — {audioUrl ? (waveReady ? 'play to find your spot, then mark it' : 'loading waveform…') : 'generate audio first'}
@@ -280,7 +296,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         </div>
       )}
 
-      {/* Megaphone DAI marker save row */}
+      {/* Megaphone DAI marker save */}
       <div className="flex items-center gap-3 pt-1 border-t border-[var(--rule)]">
         <button
           onClick={handleSave}
@@ -300,56 +316,92 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         )}
       </div>
 
-      {/* ── Sponsor Campaigns ──────────────────────────────────────────── */}
+      {/* ── Sponsor Campaigns ─────────────────────────────────────────── */}
       <div className="pt-2 border-t border-[var(--rule)]">
         <div className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-3">
           Sponsor Campaigns
         </div>
 
-        {!hasCampaigns ? (
+        {activeCampaigns.length === 0 ? (
           <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
             No active campaigns with audio yet.{' '}
-            <a href="/studio?nav=ads" className="underline hover:text-[var(--ink)]">Create one in Dynamic Ads →</a>
+            <a href="/studio?nav=ads" className="underline hover:text-[var(--ink)]">Create one in Ad Manager →</a>
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
-              Selected campaigns will be stitched into the audio when this episode publishes.
+              Selected campaigns are stitched into the audio when this episode publishes.
             </p>
+
             {activeCampaigns.map(c => {
-              const assigned = isAssigned(c.id)
+              const assignment = assignments.get(c.id)
+              const checked = !!assignment
+              const assignedType = assignment?.type ?? c.type
+
               return (
-                <div key={c.id} className="flex items-center gap-3 py-1.5">
-                  <input
-                    type="checkbox"
-                    id={`camp-${c.id}`}
-                    checked={assigned}
-                    onChange={() => toggleAssignment(c)}
-                    className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
-                  />
-                  <label htmlFor={`camp-${c.id}`} className="flex-1 cursor-pointer select-none">
-                    <span className="text-[13px] text-[var(--ink)]">{c.name}</span>
-                    <span className="ml-2 text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">{c.type}</span>
+                <div key={c.id} className="rounded-[2px] border border-[var(--rule)] p-3 space-y-2.5">
+                  {/* Row 1: checkbox + name */}
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCampaign(c)}
+                      className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
+                    />
+                    <span className="text-[13px] text-[var(--ink)] font-medium">{c.name}</span>
                   </label>
-                  {c.type === 'mid-roll' && assigned && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">at</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={insertAtInputs[c.id] ?? ''}
-                        onChange={e => updateInsertAt(c.id, e.target.value)}
-                        placeholder="sec"
-                        className="w-20 border border-[var(--rule)] rounded-[2px] px-2 py-1 text-[12px] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--ink)] transition-colors"
-                      />
-                      <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">s</span>
+
+                  {/* Row 2: type picker + mid-roll marker (only when checked) */}
+                  {checked && (
+                    <div className="ml-6 flex flex-col gap-2">
+                      {/* Type buttons */}
+                      <div className="flex gap-1.5">
+                        {AD_TYPES.map(t => (
+                          <button
+                            key={t.value}
+                            onClick={() => setAssignmentType(c.id, t.value)}
+                            className={`px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] rounded-[2px] border transition-colors ${
+                              assignedType === t.value
+                                ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
+                                : 'bg-white text-[var(--ink-faint)] border-[var(--rule)] hover:text-[var(--ink)] hover:border-[var(--ink-faint)]'
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Mid-roll: mark with waveform */}
+                      {assignedType === 'mid-roll' && (
+                        <div className="flex items-center gap-2.5">
+                          {waveReady ? (
+                            <>
+                              <button
+                                onClick={() => markCampaignHere(c.id)}
+                                className="px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--accent)] border border-[var(--accent)] rounded-[2px] hover:bg-red-50 transition-colors"
+                              >
+                                Mark here
+                              </button>
+                              <span className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] tabular-nums">
+                                {assignment?.insertAt != null
+                                  ? `set to ${formatTime(assignment.insertAt)}`
+                                  : `cursor at ${formatTime(currentTime)}`}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                              {audioUrl ? 'Load audio above to mark position' : 'Generate audio first'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )
             })}
-            <div className="flex items-center gap-3 pt-2">
+
+            <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={handleSaveAssignments}
                 disabled={assignSaving}
