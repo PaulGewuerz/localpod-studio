@@ -2,31 +2,88 @@ const { stitchCampaigns } = require('./stitchAudio');
 const { supabaseAdmin } = require('../supabase');
 
 /**
- * If the episode has ad assignments with audio, stitches them into the episode audio
- * and uploads the result to Supabase. Returns the URL to pass to Megaphone.
- * Falls back to episode.audioUrl if no stitching is needed or possible.
+ * Resolves which campaigns to stitch into the episode audio, then stitches and uploads.
  *
- * @param {object} episode - prisma episode object with adAssignments and audioUrl
+ * Priority:
+ *   1. If the episode has explicit adAssignments, use those.
+ *   2. Otherwise, auto-assign from active campaigns whose type matches the show's
+ *      adMarkerDefaults (pre-roll / post-roll only — mid-roll needs an explicit timestamp).
+ *
+ * In both cases, only campaigns that are active, have audio, and are within their
+ * date window are included.
+ *
+ * Returns the URL to pass to Megaphone (stitched or original).
+ *
+ * @param {object} episode - prisma episode with adAssignments, audioUrl, show
  * @param {string} orgId
  * @param {object} prisma
- * @returns {Promise<string>} audio URL to publish
+ * @returns {Promise<string>}
  */
 async function preparePublishAudio(episode, orgId, prisma) {
-  if (!episode.adAssignments || !episode.audioUrl) return episode.audioUrl;
+  if (!episode.audioUrl) return episode.audioUrl;
+
+  const now = new Date();
 
   let assignments;
-  try {
-    assignments = JSON.parse(episode.adAssignments);
-  } catch {
-    return episode.audioUrl;
-  }
-  if (!Array.isArray(assignments) || !assignments.length) return episode.audioUrl;
 
+  if (episode.adAssignments) {
+    // Explicit per-episode assignments
+    try {
+      assignments = JSON.parse(episode.adAssignments);
+    } catch {
+      assignments = [];
+    }
+  }
+
+  if (!assignments || assignments.length === 0) {
+    // Auto-assign from show defaults
+    const defaults = episode.show?.adMarkerDefaults
+      ? (() => { try { return JSON.parse(episode.show.adMarkerDefaults); } catch { return null; } })()
+      : null;
+
+    if (!defaults || (!defaults.preRoll && !defaults.postRoll)) return episode.audioUrl;
+
+    const activeCampaigns = await prisma.adCampaign.findMany({
+      where: {
+        organizationId: orgId,
+        status: 'active',
+        audioUrl: { not: null },
+        AND: [
+          { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+          { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        ],
+      },
+      select: { id: true, type: true, audioUrl: true },
+    });
+
+    assignments = [];
+    for (const c of activeCampaigns) {
+      if (c.type === 'pre-roll' && defaults.preRoll) {
+        assignments.push({ campaignId: c.id, type: 'pre-roll' });
+      } else if (c.type === 'post-roll' && defaults.postRoll) {
+        assignments.push({ campaignId: c.id, type: 'post-roll' });
+      }
+      // mid-roll skipped in auto-mode: no timestamp to insert at
+    }
+
+    if (!assignments.length) return episode.audioUrl;
+  }
+
+  // Fetch audio URLs for assigned campaigns, enforcing active + date window
   const campaignIds = [...new Set(assignments.map(a => a.campaignId).filter(Boolean))];
   if (!campaignIds.length) return episode.audioUrl;
 
   const campaigns = await prisma.adCampaign.findMany({
-    where: { id: { in: campaignIds }, organizationId: orgId, status: 'active' },
+    where: {
+      id: { in: campaignIds },
+      organizationId: orgId,
+      status: 'active',
+      audioUrl: { not: null },
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
     select: { id: true, audioUrl: true },
   });
 
