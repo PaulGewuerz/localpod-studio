@@ -26,7 +26,8 @@ function formatTime(s: number) {
 
 export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialMarkers, getToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const wsRef = useRef<{ getDuration: () => number; destroy: () => void } | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wsRef = useRef<any>(null)
   const [duration, setDuration] = useState(0)
   const [waveReady, setWaveReady] = useState(false)
   const [markers, setMarkers] = useState<AdMarkers>(
@@ -40,7 +41,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
 
-    let ws: { getDuration: () => number; destroy: () => void; on: (event: string, cb: (...args: unknown[]) => void) => void } | null = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ws: any = null
 
     import('wavesurfer.js').then(({ default: WaveSurfer }) => {
       if (!containerRef.current) return
