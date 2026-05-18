@@ -19,6 +19,12 @@ interface EpisodeAd {
   adMarkers: string | null
 }
 
+interface Voice {
+  id: string
+  name: string
+  elevenLabsId: string
+}
+
 interface AdCampaign {
   id: string
   name: string
@@ -93,14 +99,24 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
   const [campError, setCampError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // AI audio generation
+  const [voices, setVoices] = useState<Voice[]>([])
+  const [showGenerate, setShowGenerate] = useState(false)
+  const [adCopy, setAdCopy] = useState('')
+  const [genVoiceId, setGenVoiceId] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [genError, setGenError] = useState<string | null>(null)
+
   useEffect(() => {
     async function loadAll() {
       try {
         const token = await getToken()
-        const [epRes, meRes, campRes] = await Promise.all([
+        const [epRes, meRes, campRes, voiceRes] = await Promise.all([
           fetch(`${API_URL}/episodes`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/ad-campaigns`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/voices`, { headers: { Authorization: `Bearer ${token}` } }),
         ])
         if (epRes.ok) setEpisodes(await epRes.json())
         if (meRes.ok) {
@@ -108,6 +124,11 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
           if (me.show?.adMarkerDefaults) setDefaults(JSON.parse(me.show.adMarkerDefaults))
         }
         if (campRes.ok) setCampaigns(await campRes.json())
+        if (voiceRes.ok) {
+          const vs: Voice[] = await voiceRes.json()
+          setVoices(vs)
+          if (vs.length) setGenVoiceId(vs[0].elevenLabsId)
+        }
       } catch { /* silent */ }
       setEpLoading(false)
       setCampLoading(false)
@@ -150,10 +171,18 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
 
   // ── Campaign handlers ──────────────────────────────────────────────────────
 
+  function resetGenerate() {
+    setShowGenerate(false)
+    setAdCopy('')
+    setGeneratedUrl(null)
+    setGenError(null)
+  }
+
   function openNew() {
     setForm({ ...EMPTY_FORM })
     setEditId(null)
     setCampError(null)
+    resetGenerate()
     setShowForm(true)
   }
 
@@ -169,7 +198,37 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
     })
     setEditId(c.id)
     setCampError(null)
+    resetGenerate()
     setShowForm(true)
+  }
+
+  async function handleGenerate() {
+    if (!adCopy.trim()) { setGenError('Enter some ad copy first.'); return }
+    if (!genVoiceId) { setGenError('Select a voice.'); return }
+    setGenerating(true)
+    setGenError(null)
+    setGeneratedUrl(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/ad-campaigns/generate-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text: adCopy, voiceId: genVoiceId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Generate failed (${res.status})`)
+      setGeneratedUrl(data.audioUrl)
+    } catch (err: unknown) {
+      setGenError(err instanceof Error ? err.message : 'Generation failed.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  function useGeneratedAudio() {
+    if (!generatedUrl) return
+    setForm(f => ({ ...f, audioUrl: generatedUrl }))
+    resetGenerate()
   }
 
   async function saveCampaign() {
@@ -422,14 +481,92 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
                     {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </div>
+                {/* Audio URL + AI generation */}
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.05em]">Audio URL</label>
-                  <input
-                    value={form.audioUrl}
-                    onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
-                    placeholder="https://… (URL to the ad audio file)"
-                    className="border border-[var(--rule)] rounded-[2px] px-3 py-2 text-[13px] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--ink)] transition-colors"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.05em]">Ad Audio</label>
+                    {voices.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setShowGenerate(v => !v); setGeneratedUrl(null); setGenError(null) }}
+                        className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] hover:opacity-75 transition-opacity"
+                      >
+                        {showGenerate ? 'Cancel' : '✦ Generate with AI'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Manual URL input */}
+                  {!showGenerate && (
+                    <input
+                      value={form.audioUrl}
+                      onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
+                      placeholder="https://… (paste audio URL, or generate with AI above)"
+                      className="border border-[var(--rule)] rounded-[2px] px-3 py-2 text-[13px] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--ink)] transition-colors"
+                    />
+                  )}
+
+                  {/* AI generation panel */}
+                  {showGenerate && (
+                    <div className="border border-[var(--rule)] rounded-[2px] p-4 bg-[var(--bg)] space-y-3">
+                      <textarea
+                        value={adCopy}
+                        onChange={e => setAdCopy(e.target.value)}
+                        rows={4}
+                        placeholder="Write your ad copy here… e.g. 'This episode is brought to you by Acme Co. Visit acme.com to learn more.'"
+                        className="w-full border border-[var(--rule)] rounded-[2px] px-3 py-2.5 text-[13px] text-[var(--ink)] bg-white focus:outline-none focus:border-[var(--ink)] resize-y transition-colors"
+                      />
+                      <div className="flex items-center gap-3">
+                        <select
+                          value={genVoiceId}
+                          onChange={e => setGenVoiceId(e.target.value)}
+                          className="border border-[var(--rule)] rounded-[2px] px-3 py-1.5 text-[13px] text-[var(--ink)] bg-white focus:outline-none focus:border-[var(--ink)] transition-colors"
+                        >
+                          {voices.map(v => <option key={v.elevenLabsId} value={v.elevenLabsId}>{v.name}</option>)}
+                        </select>
+                        <button
+                          onClick={handleGenerate}
+                          disabled={generating || !adCopy.trim()}
+                          className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 rounded-[2px] transition-opacity"
+                        >
+                          {generating ? (
+                            <span className="flex items-center gap-2">
+                              <span className="lp-spin inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
+                              Generating…
+                            </span>
+                          ) : 'Generate →'}
+                        </button>
+                      </div>
+                      {genError && (
+                        <p className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{genError}</p>
+                      )}
+                      {generatedUrl && (
+                        <div className="space-y-2 pt-1 border-t border-[var(--rule)]">
+                          <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)]">Preview</div>
+                          <audio controls src={generatedUrl} className="w-full" />
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={useGeneratedAudio}
+                              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--green)] hover:opacity-90 rounded-[2px] transition-opacity"
+                            >
+                              Use this audio →
+                            </button>
+                            <button
+                              onClick={() => { setGeneratedUrl(null); setAdCopy('') }}
+                              className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] hover:text-[var(--ink)]"
+                            >
+                              Regenerate
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Show current URL if set */}
+                  {form.audioUrl && !showGenerate && (
+                    <audio controls src={form.audioUrl} className="w-full mt-1" />
+                  )}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.05em]">Status</label>

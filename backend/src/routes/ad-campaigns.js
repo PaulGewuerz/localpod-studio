@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
+const { supabaseAdmin } = require('../supabase');
 
+const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const VALID_TYPES = ['pre-roll', 'mid-roll', 'post-roll'];
 const VALID_STATUSES = ['active', 'paused'];
 
@@ -74,6 +76,57 @@ router.delete('/:id', async (req, res) => {
 
   await prisma.adCampaign.delete({ where: { id } });
   res.json({ deleted: true });
+});
+
+// POST /ad-campaigns/generate-audio — generate TTS audio for an ad and return a hosted URL
+router.post('/generate-audio', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { text, voiceId } = req.body;
+
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+  if (!voiceId)      return res.status(400).json({ error: 'voiceId is required' });
+
+  const voice = await prisma.voice.findUnique({ where: { elevenLabsId: voiceId } });
+  if (!voice) return res.status(404).json({ error: 'Voice not found' });
+
+  let audioBuffer;
+  try {
+    const response = await fetch(`${ELEVENLABS_API_URL}/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text: text.trim(),
+        model_id: 'eleven_turbo_v2_5',
+        language_code: 'en',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: err.detail?.message || 'ElevenLabs API error' });
+    }
+    audioBuffer = Buffer.from(await response.arrayBuffer());
+  } catch (err) {
+    console.error('ElevenLabs ad audio error:', err.message);
+    return res.status(500).json({ error: 'Failed to generate audio' });
+  }
+
+  const storagePath = `ads/${orgId}/${Date.now()}.mp3`;
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from('audio')
+    .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg' });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError.message);
+    return res.status(500).json({ error: 'Failed to store audio' });
+  }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from('audio').getPublicUrl(storagePath);
+  res.json({ audioUrl: publicUrl });
 });
 
 module.exports = router;
