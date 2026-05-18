@@ -23,6 +23,7 @@ router.get('/', async (req, res) => {
       publishedUrl: true,
       characterCount: true,
       megaphoneEpisodeId: true,
+      adMarkers: true,
       scheduledAt: true,
       createdAt: true,
       voice: { select: { name: true } },

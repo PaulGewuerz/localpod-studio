@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
 router.patch('/', async (req, res) => {
-  const { showName, author, description, category, categories, defaultVoiceId, coverArtUrl } = req.body;
+  const { showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults } = req.body;
   const orgId = req.user.organization.id;
 
   // Normalize: accept either `categories` (array) or legacy `category` (string)
@@ -40,15 +40,16 @@ router.patch('/', async (req, res) => {
 
   const updates = [];
 
-  if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined) {
+  if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined || adMarkerDefaults !== undefined) {
     const show = await prisma.show.findFirst({ where: { organizationId: orgId } });
     if (show) {
       const data = {};
-      if (showName !== undefined)       data.name = showName;
-      if (author !== undefined)         data.author = author;
-      if (description !== undefined)    data.description = description;
-      if (categoryValue !== undefined)  data.category = categoryValue;
-      if (coverArtUrl !== undefined)    data.coverArtUrl = coverArtUrl;
+      if (showName !== undefined)          data.name = showName;
+      if (author !== undefined)            data.author = author;
+      if (description !== undefined)       data.description = description;
+      if (categoryValue !== undefined)     data.category = categoryValue;
+      if (coverArtUrl !== undefined)       data.coverArtUrl = coverArtUrl;
+      if (adMarkerDefaults !== undefined)  data.adMarkerDefaults = JSON.stringify(adMarkerDefaults);
       await prisma.show.update({ where: { id: show.id }, data });
     }
     updates.push('show');

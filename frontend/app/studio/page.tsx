@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import AdsView from './AdsView'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -36,13 +37,13 @@ interface MeData {
   subscription: { stripeCustomerId: string | null } | null
 }
 
-type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings'
+type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings' | 'ads'
 type NewEpStage = 'form' | 'processing'
 
 const NAV_TITLES: Record<NavKey, string> = {
   dashboard: 'Dashboard', new: 'New Episode', episodes: 'Episodes',
   analytics: 'Analytics', billing: 'Billing', shows: 'Shows',
- dist: 'Distribution', settings: 'Settings',
+  dist: 'Distribution', settings: 'Settings', ads: 'Dynamic Ads',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -441,7 +442,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
 
         // Honor ?nav= query param (e.g. return from Stripe billing portal)
         const navParam = searchParams.get('nav') as NavKey | null
-        const validNavKeys: NavKey[] = ['dashboard', 'new', 'episodes', 'analytics', 'billing', 'shows', 'dist', 'settings']
+        const validNavKeys: NavKey[] = ['dashboard', 'new', 'episodes', 'analytics', 'billing', 'shows', 'dist', 'settings', 'ads']
         if (navParam && validNavKeys.includes(navParam)) setActiveNav(navParam)
 
         // Load voices
@@ -800,6 +801,7 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
           </div>
           <NavItem navKey="shows"     icon="◈" label="Shows" />
           <NavItem navKey="analytics" icon="◌" label="Analytics" />
+          <NavItem navKey="ads"       icon="◧" label="Dynamic Ads" />
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Settings
@@ -1176,6 +1178,11 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
           {/* ── ANALYTICS ─────────────────────────────────────────────── */}
           {activeNav === 'analytics' && (
             <AnalyticsView />
+          )}
+
+          {/* ── ADS ───────────────────────────────────────────────────── */}
+          {activeNav === 'ads' && (
+            <AdsView getToken={getToken} />
           )}
 
           {/* ── BILLING ───────────────────────────────────────────────── */}

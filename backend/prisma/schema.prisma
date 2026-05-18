@@ -18,6 +18,7 @@ model Organization {
   shows                Show[]
   subscription         Subscription?
   pronunciationRules   PronunciationRule[]
+  adCampaigns          AdCampaign[]
   defaultVoice         Voice?        @relation(fields: [defaultVoiceId], references: [id])
 }
 
@@ -31,17 +32,18 @@ model User {
 }
 
 model Show {
-  id             String       @id @default(uuid())
-  name           String
-  description    String?
-  coverArtUrl    String?
-  author         String?
+  id                  String       @id @default(uuid())
+  name                String
+  description         String?
+  coverArtUrl         String?
+  author              String?
   category            String?
   directoryStatuses   Json?
+  adMarkerDefaults    String?      // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
   createdAt           DateTime     @default(now())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  episodes       Episode[]
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  episodes            Episode[]
 }
 
 model Voice {
@@ -84,6 +86,20 @@ model PronunciationRule {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, word])
+}
+
+model AdCampaign {
+  id             String       @id @default(uuid())
+  name           String
+  audioUrl       String?
+  type           String       // pre-roll | mid-roll | post-roll
+  status         String       @default("active")
+  startDate      DateTime?
+  endDate        DateTime?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }
 
 model Subscription {

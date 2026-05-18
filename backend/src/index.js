@@ -33,6 +33,7 @@ app.use('/me', requireAuth, require('./routes/me'));
 app.use('/auth', require('./routes/auth'));
 
 app.use('/analytics', requireActiveSubscription, require('./routes/analytics'));
+app.use('/ad-campaigns', requireActiveSubscription, require('./routes/ad-campaigns'));
 app.use('/billing', require('./routes/billing'));
 app.use('/admin', require('./middleware/requireAdmin'), require('./routes/admin'));
 app.use('/pronunciation', require('./routes/pronunciation'));
