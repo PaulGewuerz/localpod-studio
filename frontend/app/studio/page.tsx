@@ -382,7 +382,7 @@ function StudioInner() {
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null)
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
 
-const showNotesRef = useRef<HTMLTextAreaElement>(null)
+const showNotesRef = useRef<HTMLDivElement>(null)
   const audioFileRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -679,22 +679,18 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
   }
 
   function insertLink() {
-    const ta = showNotesRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const selected = showNotes.slice(start, end)
+    const div = showNotesRef.current
+    if (!div) return
     const url = window.prompt('URL:', 'https://')
     if (!url) return
-    const linkText = selected || url
-    const tag = `<a href="${url}">${linkText}</a>`
-    const next = showNotes.slice(0, start) + tag + showNotes.slice(end)
-    setShowNotes(next)
-    // Restore focus and position cursor after the inserted tag
-    requestAnimationFrame(() => {
-      ta.focus()
-      ta.setSelectionRange(start + tag.length, start + tag.length)
+    div.focus()
+    document.execCommand('createLink', false, url)
+    // Ensure all links open in a new tab
+    div.querySelectorAll('a').forEach(a => {
+      a.target = '_blank'
+      a.rel = 'noreferrer noopener'
     })
+    setShowNotes(div.innerHTML)
   }
 
   function toggleVoicePreview(voice: Voice) {
@@ -1086,19 +1082,18 @@ const showNotesRef = useRef<HTMLTextAreaElement>(null)
                           + Link
                         </button>
                       </div>
-                      <textarea
+                      <div
                         ref={showNotesRef}
-                        className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] resize-y min-h-[80px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors"
-                        placeholder="Optional — appears in the episode description on Spotify, Apple Podcasts, etc."
-                        value={showNotes}
-                        onChange={e => setShowNotes(e.target.value)}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={() => setShowNotes(showNotesRef.current?.innerHTML ?? '')}
+                        onClick={e => {
+                          const link = (e.target as HTMLElement).closest('a')
+                          if (link) { e.preventDefault(); window.open(link.getAttribute('href') ?? '', '_blank', 'noreferrer') }
+                        }}
+                        className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] min-h-[80px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
+                        data-placeholder="Optional — appears in the episode description on Spotify, Apple Podcasts, etc."
                       />
-                      {showNotes.includes('<') && (
-                        <div
-                          className="px-3.5 py-2.5 border border-[var(--rule)] rounded-[2px] bg-white text-[13px] font-[family-name:var(--font-dm-sans)] text-[var(--ink-light)] leading-relaxed [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2"
-                          dangerouslySetInnerHTML={{ __html: showNotes }}
-                        />
-                      )}
                     </div>
 
 
