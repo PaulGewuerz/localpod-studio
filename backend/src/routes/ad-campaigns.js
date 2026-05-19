@@ -7,6 +7,14 @@ const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const VALID_TYPES = ['pre-roll', 'mid-roll', 'post-roll'];
 const VALID_STATUSES = ['active', 'paused'];
 
+// Parse a YYYY-MM-DD date string as end-of-day UTC so campaigns run through the full day.
+function parseEndDate(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
+
 // GET /ad-campaigns
 router.get('/', async (req, res) => {
   const orgId = req.user.organization.id;
@@ -32,7 +40,7 @@ router.post('/', async (req, res) => {
       type,
       status: VALID_STATUSES.includes(status) ? status : 'active',
       startDate: startDate ? new Date(startDate) : null,
-      endDate: endDate ? new Date(endDate) : null,
+      endDate: parseEndDate(endDate),
       notes: notes || null,
       organizationId: orgId,
     },
