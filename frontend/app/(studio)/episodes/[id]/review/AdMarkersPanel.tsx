@@ -66,12 +66,9 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
     let ws: any = null
     import('wavesurfer.js').then(({ default: WaveSurfer }) => {
       if (!containerRef.current) return
-      const media = new Audio()
-      media.crossOrigin = 'anonymous'
-      media.src = audioUrl
       ws = WaveSurfer.create({
         container: containerRef.current,
-        media,
+        url: audioUrl,
         waveColor: '#d1d5db',
         progressColor: '#374151',
         height: 72,
