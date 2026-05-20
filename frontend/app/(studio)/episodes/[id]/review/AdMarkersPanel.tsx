@@ -207,7 +207,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         <>
           {/* Waveform — only shown when a mid-roll is assigned */}
           {audioUrl && (
-            <div>
+            <div className={hasMidRollAssigned ? '' : 'hidden'}>
               <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-2">
                 {waveReady ? 'Scrub to the mid-roll position, then click Mark here' : 'Loading waveform…'}
               </div>
