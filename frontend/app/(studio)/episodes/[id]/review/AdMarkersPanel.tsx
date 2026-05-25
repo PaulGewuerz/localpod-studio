@@ -77,7 +77,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !audioUrl || !waveEnabled) return
+    if (!containerRef.current || !audioUrl) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let ws: any = null
     import('wavesurfer.js').then(({ default: WaveSurfer }) => {
@@ -109,7 +109,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       wsRef.current = ws
     })
     return () => { ws?.destroy() }
-  }, [audioUrl, episodeId, waveEnabled])
+  }, [audioUrl, episodeId])
 
   useEffect(() => {
     async function load() {
