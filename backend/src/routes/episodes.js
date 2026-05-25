@@ -12,9 +12,12 @@ const AUDIO_BUCKET = 'audio';
 
 router.get('/', async (req, res) => {
   const orgId = req.user.organization.id;
+  const { showId } = req.query;
 
   const episodes = await prisma.episode.findMany({
-    where: { show: { organizationId: orgId } },
+    where: showId
+      ? { showId, show: { organizationId: orgId } }
+      : { show: { organizationId: orgId } },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -102,9 +105,9 @@ router.patch('/:id/approve', async (req, res) => {
     return res.status(400).json({ error: 'Episode is already published' });
   }
 
-  const megaphoneShowId = req.user.organization.megaphoneShowId;
+  const megaphoneShowId = episode.show.megaphoneShowId;
   if (!megaphoneShowId) {
-    return res.status(400).json({ error: 'Organization has no Megaphone show configured' });
+    return res.status(400).json({ error: 'Show has no Megaphone show configured' });
   }
 
   // Mark approved first — if Megaphone fails we preserve the approval
@@ -157,7 +160,7 @@ router.delete('/:id', async (req, res) => {
 
     // Best-effort: delete from Megaphone
     if (episode.megaphoneEpisodeId) {
-      const megaphoneShowId = req.user.organization.megaphoneShowId;
+      const megaphoneShowId = episode.show.megaphoneShowId;
       if (megaphoneShowId) {
         try {
           const adapter = getHostingAdapter();
@@ -430,7 +433,7 @@ router.patch('/:id/ad-markers', async (req, res) => {
 
   // If published, sync to Megaphone immediately
   if (episode.megaphoneEpisodeId) {
-    const megaphoneShowId = req.user.organization.megaphoneShowId;
+    const megaphoneShowId = episode.show.megaphoneShowId;
     if (megaphoneShowId) {
       try {
         const adapter = getHostingAdapter();

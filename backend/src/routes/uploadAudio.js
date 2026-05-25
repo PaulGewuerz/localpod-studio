@@ -16,7 +16,7 @@ router.post(
       return res.status(400).json({ error: 'Unsupported audio format. Use MP3, M4A, WAV, or AAC.' });
     }
 
-    const { title, description } = req.query;
+    const { title, description, showId } = req.query;
     if (!req.body || req.body.length === 0) {
       return res.status(400).json({ error: 'No audio data received' });
     }
@@ -45,7 +45,9 @@ router.post(
       .from(AUDIO_BUCKET)
       .getPublicUrl(storagePath);
 
-    const show = await prisma.show.findFirst({ where: { organizationId: org.id } });
+    const show = showId
+      ? await prisma.show.findFirst({ where: { id: showId, organizationId: org.id } })
+      : await prisma.show.findFirst({ where: { organizationId: org.id } });
     if (!show) {
       return res.status(400).json({ error: 'No show configured for this organization' });
     }

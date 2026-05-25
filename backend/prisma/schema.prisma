@@ -10,8 +10,6 @@ datasource db {
 model Organization {
   id               String        @id @default(uuid())
   name             String
-  megaphoneShowId  String?
-  megaphoneRssUrl  String?
   defaultVoiceId   String?
   createdAt        DateTime      @default(now())
   users                User[]
@@ -40,6 +38,8 @@ model Show {
   category            String?
   directoryStatuses   Json?
   adMarkerDefaults    String?      // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
+  megaphoneShowId     String?
+  megaphoneRssUrl     String?
   createdAt           DateTime     @default(now())
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])

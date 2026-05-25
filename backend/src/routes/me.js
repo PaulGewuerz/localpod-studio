@@ -4,12 +4,12 @@ const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
 
-// GET /me — current publisher's org, show, subscription, voice
+// GET /me — current publisher's org, shows, subscription, voice
 router.get('/', async (req, res) => {
   const org = await prisma.organization.findUnique({
     where: { id: req.user.organization.id },
     include: {
-      shows: { take: 1 },
+      shows: { orderBy: { createdAt: 'asc' } },
       subscription: true,
       defaultVoice: { select: { id: true, name: true, elevenLabsId: true, description: true, previewUrl: true } },
     },
@@ -19,18 +19,16 @@ router.get('/', async (req, res) => {
     org: {
       id: org.id,
       name: org.name,
-      megaphoneShowId: org.megaphoneShowId,
-      megaphoneRssUrl: org.megaphoneRssUrl ?? null,
       defaultVoice: org.defaultVoice ?? null,
     },
-    show: org.shows[0] ?? null,
+    shows: org.shows,
     subscription: org.subscription,
   });
 });
 
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
 router.patch('/', async (req, res) => {
-  const { showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults } = req.body;
+  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults } = req.body;
   const orgId = req.user.organization.id;
 
   // Normalize: accept either `categories` (array) or legacy `category` (string)
@@ -41,7 +39,9 @@ router.patch('/', async (req, res) => {
   const updates = [];
 
   if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined || adMarkerDefaults !== undefined) {
-    const show = await prisma.show.findFirst({ where: { organizationId: orgId } });
+    const show = showId
+      ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
+      : await prisma.show.findFirst({ where: { organizationId: orgId } });
     if (show) {
       const data = {};
       if (showName !== undefined)          data.name = showName;
@@ -66,19 +66,21 @@ router.patch('/', async (req, res) => {
   // Sync show metadata to Megaphone if relevant fields changed
   if (updates.includes('show') && (showName !== undefined || description !== undefined || coverArtUrl !== undefined)) {
     try {
-      const org = await prisma.organization.findUnique({ where: { id: orgId } });
-      if (org?.megaphoneShowId) {
+      const show = showId
+        ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
+        : await prisma.show.findFirst({ where: { organizationId: orgId } });
+      if (show?.megaphoneShowId) {
         const hosting = getHostingAdapter();
         const megaphoneUpdates = {};
         if (showName !== undefined)    megaphoneUpdates.title = showName;
         if (description !== undefined) megaphoneUpdates.summary = description;
 
         if (Object.keys(megaphoneUpdates).length > 0) {
-          await hosting.updatePodcast(org.megaphoneShowId, megaphoneUpdates);
+          await hosting.updatePodcast(show.megaphoneShowId, megaphoneUpdates);
         }
 
         if (coverArtUrl !== undefined) {
-          await hosting.uploadPodcastCoverArt(org.megaphoneShowId, coverArtUrl);
+          await hosting.uploadPodcastCoverArt(show.megaphoneShowId, coverArtUrl);
         }
       }
     } catch (err) {

@@ -51,7 +51,7 @@ function computeParagraphMeta(fullText, paragraphs, alignment) {
 }
 
 router.post('/', async (req, res) => {
-  const { articleText, voiceId, title, description } = req.body;
+  const { articleText, voiceId, title, description, showId } = req.body;
   if (!articleText) return res.status(400).json({ error: 'articleText is required' });
   if (!voiceId)     return res.status(400).json({ error: 'voiceId is required' });
 
@@ -130,7 +130,9 @@ router.post('/', async (req, res) => {
   const { data: { publicUrl } } = supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(storagePath);
 
   const voice = await prisma.voice.findUnique({ where: { elevenLabsId: voiceId } });
-  const show  = await prisma.show.findFirst({ where: { organizationId: org.id } });
+  const show = showId
+    ? await prisma.show.findFirst({ where: { id: showId, organizationId: org.id } })
+    : await prisma.show.findFirst({ where: { organizationId: org.id } });
   if (!show) return res.status(400).json({ error: 'No show configured for this organization' });
 
   const episode = await prisma.episode.create({

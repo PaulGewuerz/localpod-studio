@@ -24,9 +24,9 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Episode has no audio — generate audio first' });
   }
 
-  const megaphoneShowId = req.user.organization.megaphoneShowId;
+  const megaphoneShowId = episode.show.megaphoneShowId;
   if (!megaphoneShowId) {
-    return res.status(400).json({ error: 'Organization has no Megaphone show configured' });
+    return res.status(400).json({ error: 'Show has no Megaphone show configured' });
   }
 
   try {

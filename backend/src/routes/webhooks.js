@@ -43,20 +43,20 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
               where: { organizationId: user.organization.id },
             });
 
-            // Create Megaphone podcast if not already created
-            if (!user.organization.megaphoneShowId) {
+            // Create Megaphone podcast if not already created for this show
+            if (show && !show.megaphoneShowId) {
               try {
                 const adapter = getHostingAdapter();
-                const showTitle = show?.name ?? user.organization.name;
+                const showTitle = show.name ?? user.organization.name;
                 const slug = showTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-                const coverArtUrl = show?.coverArtUrl ?? null;
+                const coverArtUrl = show.coverArtUrl ?? null;
                 const { id: megaphoneShowId, rssUrl } = await adapter.createPodcast({
                   title: showTitle,
                   slug,
-                  summary: show?.description,
-                  category: show?.category,
-                  author: show?.author || showTitle,
-                  ownerName: show?.author || showTitle,
+                  summary: show.description,
+                  category: show.category,
+                  author: show.author || showTitle,
+                  ownerName: show.author || showTitle,
                   ownerEmail: 'paul@localpod.co',
                 });
                 console.log('Megaphone show created:', megaphoneShowId);
@@ -70,8 +70,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
                   }
                 }
 
-                await prisma.organization.update({
-                  where: { id: user.organization.id },
+                await prisma.show.update({
+                  where: { id: show.id },
                   data: { megaphoneShowId, megaphoneRssUrl: rssUrl },
                 });
               } catch (err) {

@@ -3,13 +3,16 @@ const router = express.Router();
 const prisma = require('../prisma');
 const { getHostingAdapter } = require('../adapters/hosting');
 
-// GET /analytics — fetch Megaphone episode download data for this org's show
+// GET /analytics — fetch Megaphone episode download data for a show
 router.get('/', async (req, res) => {
-  const org = await prisma.organization.findUnique({
-    where: { id: req.user.organization.id },
-  });
+  const orgId = req.user.organization.id;
+  const { showId } = req.query;
 
-  if (!org.megaphoneShowId) {
+  const show = showId
+    ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
+    : await prisma.show.findFirst({ where: { organizationId: orgId }, orderBy: { createdAt: 'asc' } });
+
+  if (!show?.megaphoneShowId) {
     return res.json({ available: false, reason: 'No Megaphone show connected yet.' });
   }
 
@@ -17,7 +20,7 @@ router.get('/', async (req, res) => {
     const adapter = getHostingAdapter();
 
     // Fetch episodes (includes per-episode download counts)
-    const episodes = await adapter.getEpisodes(org.megaphoneShowId);
+    const episodes = await adapter.getEpisodes(show.megaphoneShowId);
 
     // Build a map from megaphoneEpisodeId → our internal episode ID
     const dbEpisodes = await prisma.episode.findMany({
@@ -43,7 +46,7 @@ router.get('/', async (req, res) => {
     const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     let stats = null;
     try {
-      stats = await adapter.getPodcastStats(org.megaphoneShowId, { from, to });
+      stats = await adapter.getPodcastStats(show.megaphoneShowId, { from, to });
     } catch {
       // Stats endpoint optional — don't fail the whole request
     }

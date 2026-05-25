@@ -9,14 +9,15 @@ router.get('/publishers', async (req, res) => {
     select: {
       id: true,
       name: true,
-      megaphoneShowId: true,
-      megaphoneRssUrl: true,
       defaultVoiceId: true,
       createdAt: true,
       users: { select: { id: true, email: true, name: true } },
       subscription: { select: { status: true, plan: true } },
       defaultVoice: { select: { id: true, name: true } },
-      shows: { take: 1, select: { id: true } },
+      shows: {
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, name: true, megaphoneShowId: true, megaphoneRssUrl: true },
+      },
     },
   });
   res.json(orgs);
@@ -64,16 +65,14 @@ router.post('/publishers', async (req, res) => {
   res.status(201).json({ org, ...(warnings.length ? { warnings } : {}) });
 });
 
-// PATCH /admin/publishers/:orgId — update megaphoneShowId and/or defaultVoiceId
+// PATCH /admin/publishers/:orgId — update org-level fields (name, defaultVoiceId)
 router.patch('/publishers/:orgId', async (req, res) => {
   const { orgId } = req.params;
-  const { megaphoneShowId, defaultVoiceId, orgName, megaphoneRssUrl } = req.body;
+  const { defaultVoiceId, orgName } = req.body;
 
   const data = {};
-  if (orgName !== undefined)          data.name = orgName;
-  if (megaphoneShowId !== undefined)  data.megaphoneShowId = megaphoneShowId || null;
-  if (megaphoneRssUrl !== undefined)  data.megaphoneRssUrl = megaphoneRssUrl || null;
-  if (defaultVoiceId !== undefined)   data.defaultVoiceId = defaultVoiceId || null;
+  if (orgName !== undefined)        data.name = orgName;
+  if (defaultVoiceId !== undefined) data.defaultVoiceId = defaultVoiceId || null;
 
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ error: 'Nothing to update' });
@@ -86,10 +85,48 @@ router.patch('/publishers/:orgId', async (req, res) => {
       users: { select: { id: true, email: true, name: true } },
       subscription: { select: { status: true, plan: true } },
       defaultVoice: { select: { id: true, name: true } },
+      shows: {
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, name: true, megaphoneShowId: true, megaphoneRssUrl: true },
+      },
     },
   });
 
   res.json({ org });
+});
+
+// PATCH /admin/publishers/:orgId/shows/:showId — update Megaphone fields for a specific show
+router.patch('/publishers/:orgId/shows/:showId', async (req, res) => {
+  const { orgId, showId } = req.params;
+  const { megaphoneShowId, megaphoneRssUrl, showName } = req.body;
+
+  const show = await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } });
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+
+  const data = {};
+  if (showName !== undefined)         data.name = showName;
+  if (megaphoneShowId !== undefined)  data.megaphoneShowId = megaphoneShowId || null;
+  if (megaphoneRssUrl !== undefined)  data.megaphoneRssUrl = megaphoneRssUrl || null;
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Nothing to update' });
+  }
+
+  const updated = await prisma.show.update({ where: { id: showId }, data });
+  res.json({ show: updated });
+});
+
+// POST /admin/publishers/:orgId/shows — add a show to an existing org
+router.post('/publishers/:orgId/shows', async (req, res) => {
+  const { orgId } = req.params;
+  const { showName } = req.body;
+  if (!showName) return res.status(400).json({ error: 'showName is required' });
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+  const show = await prisma.show.create({ data: { name: showName, organizationId: orgId } });
+  res.status(201).json({ show });
 });
 
 // PATCH /admin/publishers/:orgId/directories — set directory submission statuses

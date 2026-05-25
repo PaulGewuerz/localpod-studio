@@ -31,9 +31,18 @@ interface Episode {
 }
 
 
+interface ShowData {
+  id: string
+  name: string
+  description: string | null
+  coverArtUrl: string | null
+  megaphoneShowId: string | null
+  megaphoneRssUrl: string | null
+}
+
 interface MeData {
-  org: { id: string; name: string; megaphoneShowId: string | null; megaphoneRssUrl: string | null; defaultVoice: Voice | null }
-  show: { name: string; description: string | null; coverArtUrl: string | null } | null
+  org: { id: string; name: string; defaultVoice: Voice | null }
+  shows: ShowData[]
   subscription: { stripeCustomerId: string | null } | null
 }
 
@@ -223,7 +232,7 @@ function EpisodeTable({ episodes, onNew, onDelete }: {
 
 // ─── Analytics View ────────────────────────────────────────────────────────────
 
-function AnalyticsView() {
+function AnalyticsView({ showId }: { showId: string | null }) {
   const [data, setData] = useState<{
     available: boolean
     reason?: string
@@ -234,9 +243,11 @@ function AnalyticsView() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
       try {
         const token = await getToken()
-        const res = await fetch(`${API_URL}/analytics`, {
+        const url = showId ? `${API_URL}/analytics?showId=${showId}` : `${API_URL}/analytics`
+        const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` },
         })
         setData(await res.json())
@@ -247,7 +258,7 @@ function AnalyticsView() {
       }
     }
     load()
-  }, [])
+  }, [showId])
 
   if (loading) return <p className="text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-sm">Loading analytics…</p>
 
@@ -341,6 +352,7 @@ function StudioInner() {
   const searchParams = useSearchParams()
 
   const [me, setMe] = useState<MeData | null>(null)
+  const [activeShowId, setActiveShowId] = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
   const [voices, setVoices] = useState<Voice[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
@@ -438,6 +450,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         if (!subscription?.stripeCustomerId) { router.replace('/onboarding'); return }
 
         setMe(meData)
+        if (meData!.shows.length > 0) setActiveShowId(meData!.shows[0].id)
         if (meData!.org.defaultVoice) setSelectedVoiceId(meData!.org.defaultVoice.id)
 
         // Honor ?nav= query param (e.g. return from Stripe billing portal)
@@ -463,7 +476,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       setLoadingEpisodes(true)
       try {
         const token = await getToken()
-        const res = await fetch(`${API_URL}/episodes`, {
+        const url = activeShowId
+          ? `${API_URL}/episodes?showId=${activeShowId}`
+          : `${API_URL}/episodes`
+        const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) setEpisodes(await res.json())
@@ -471,20 +487,21 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       finally { setLoadingEpisodes(false) }
     }
     load()
-  }, [episodeRefreshKey])
+  }, [episodeRefreshKey, activeShowId])
 
   // ── Sync settings form from me when tab opens ────────────────────────────────
 
   useEffect(() => {
-    if (activeNav === 'settings' && me?.show) {
-      setSettingsName(me.show.name ?? '')
-      setSettingsDescription(me.show.description ?? '')
-      setSettingsCoverPreview(me.show.coverArtUrl ?? null)
+    const activeShow = me?.shows.find(s => s.id === activeShowId) ?? me?.shows[0] ?? null
+    if (activeNav === 'settings' && activeShow) {
+      setSettingsName(activeShow.name ?? '')
+      setSettingsDescription(activeShow.description ?? '')
+      setSettingsCoverPreview(activeShow.coverArtUrl ?? null)
       setSettingsCoverFile(null)
       setSettingsError(null)
       setSettingsSaved(false)
     }
-  }, [activeNav, me])
+  }, [activeNav, me, activeShowId])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -523,6 +540,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           voiceId: voice.elevenLabsId,
           title: epTitle || 'Untitled Episode',
           description: showNotes || undefined,
+          showId: activeShowId || undefined,
         }),
       })
 
@@ -565,6 +583,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       const token = await getToken()
       const params = new URLSearchParams({ title: epTitle || 'Untitled Episode' })
       if (showNotes) params.set('description', showNotes)
+      if (activeShowId) params.set('showId', activeShowId)
 
       setProcessingStep(1)
       const upRes = await fetch(`${API_URL}/upload-audio?${params}`, {
@@ -645,6 +664,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          showId: activeShowId || undefined,
           showName: settingsName || undefined,
           description: settingsDescription || undefined,
           ...(coverArtUrl ? { coverArtUrl } : {}),
@@ -660,12 +680,12 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       // Update local me state so sidebar/shows tab reflect the change immediately
       setMe(prev => prev ? {
         ...prev,
-        show: prev.show ? {
-          ...prev.show,
-          name: settingsName || prev.show.name,
-          description: settingsDescription || prev.show.description,
+        shows: prev.shows.map(s => s.id === activeShowId ? {
+          ...s,
+          name: settingsName || s.name,
+          description: settingsDescription || s.description,
           ...(cacheBustedUrl ? { coverArtUrl: cacheBustedUrl } : {}),
-        } : prev.show,
+        } : s),
       } : prev)
 
       setSettingsCoverFile(null)
@@ -846,6 +866,15 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             <h1 className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)]">
               {NAV_TITLES[activeNav]}
             </h1>
+            {me && me.shows.length > 1 && (
+              <select
+                className="text-[12px] font-[family-name:var(--font-dm-mono)] border border-[var(--rule)] rounded-[3px] px-2 py-1 bg-[var(--bg-warm)] text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--ink)]"
+                value={activeShowId ?? ''}
+                onChange={e => setActiveShowId(e.target.value)}
+              >
+                {me.shows.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden sm:flex items-center gap-1.5 text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
@@ -869,7 +898,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 {[
                   { label: 'Episodes Published', value: publishedCount.toString(), delta: `${episodes.filter(e => e.status === 'published').length} total` },
                   { label: 'Drafts', value: episodes.filter(e => e.status === 'draft').length.toString(), delta: 'Not yet published' },
-                  { label: 'Active Show', value: '1', delta: me.show?.name ?? me.org.name },
+                  { label: 'Active Show', value: me.shows.length.toString(), delta: (me.shows.find(s => s.id === activeShowId) ?? me.shows[0])?.name ?? me.org.name },
                   { label: 'Next Scheduled', value: nextScheduled ? 'Yes' : '—', delta: nextScheduled?.title.slice(0, 28) ?? 'Nothing scheduled' },
                 ].map(s => (
                   <div key={s.label} className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
@@ -953,7 +982,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Show</label>
                         <div className="border border-[var(--rule)] rounded-[2px] px-3 py-2.5 text-[13px] bg-[var(--bg-warm)] text-[var(--ink-light)]">
-                          {me.show?.name ?? me.org.name}
+                          {(me.shows.find(s => s.id === activeShowId) ?? me.shows[0])?.name ?? me.org.name}
                         </div>
                       </div>
                     </div>
@@ -1172,7 +1201,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
           {/* ── ANALYTICS ─────────────────────────────────────────────── */}
           {activeNav === 'analytics' && (
-            <AnalyticsView />
+            <AnalyticsView showId={activeShowId} />
           )}
 
           {/* ── ADS ───────────────────────────────────────────────────── */}
@@ -1208,46 +1237,49 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
           {/* ── SHOWS ─────────────────────────────────────────────────── */}
           {activeNav === 'shows' && (
-            <div className="max-w-xl">
-              {me.show ? (
-                <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6 flex gap-6 items-start">
-                  {me.show.coverArtUrl ? (
+            <div className="max-w-xl space-y-3">
+              {me.shows.length === 0 ? (
+                <p className="text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No show found.</p>
+              ) : me.shows.map(show => (
+                <div key={show.id} className={`bg-white border rounded-[2px] p-6 flex gap-6 items-start cursor-pointer transition-colors ${show.id === activeShowId ? 'border-[var(--ink)]' : 'border-[var(--rule)] hover:border-gray-300'}`} onClick={() => setActiveShowId(show.id)}>
+                  {show.coverArtUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={me.show.coverArtUrl}
-                      alt={me.show.name}
-                      className="w-32 h-32 rounded-[2px] object-cover shrink-0 border border-[var(--rule)]"
+                      src={show.coverArtUrl}
+                      alt={show.name}
+                      className="w-20 h-20 rounded-[2px] object-cover shrink-0 border border-[var(--rule)]"
                     />
                   ) : (
-                    <div className="w-32 h-32 rounded-[2px] bg-[var(--bg-warm)] border border-[var(--rule)] shrink-0 flex items-center justify-center text-[var(--ink-faint)] text-xs font-[family-name:var(--font-dm-mono)]">
+                    <div className="w-20 h-20 rounded-[2px] bg-[var(--bg-warm)] border border-[var(--rule)] shrink-0 flex items-center justify-center text-[var(--ink-faint)] text-xs font-[family-name:var(--font-dm-mono)]">
                       No art
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">
-                      {me.show.name}
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)] mb-1">
+                      {show.name}
                     </div>
-                    {me.show.description ? (
-                      <p className="text-[13px] text-[var(--ink-light)] leading-relaxed">
-                        {me.show.description}
-                      </p>
+                    {show.description ? (
+                      <p className="text-[13px] text-[var(--ink-light)] leading-relaxed">{show.description}</p>
                     ) : (
                       <p className="text-[13px] text-[var(--ink-faint)] italic">No description yet.</p>
                     )}
+                    {show.id === activeShowId && (
+                      <p className="text-[11px] text-[var(--blue)] font-[family-name:var(--font-dm-mono)] mt-1.5">Active show</p>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <p className="text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No show found.</p>
-              )}
+              ))}
             </div>
           )}
 
           {/* ── DISTRIBUTION ──────────────────────────────────────────── */}
-          {activeNav === 'dist' && (
+          {activeNav === 'dist' && (() => {
+            const activeShow = me.shows.find(s => s.id === activeShowId) ?? me.shows[0] ?? null
+            return (
             <div className="max-w-xl space-y-6">
               {/* Embed player */}
-              {me.org.megaphoneRssUrl && (() => {
-                const externalId = me.org.megaphoneRssUrl.split('/').pop()
+              {activeShow?.megaphoneRssUrl && (() => {
+                const externalId = activeShow.megaphoneRssUrl!.split('/').pop()
                 const embedCode = `<iframe src="https://playlist.megaphone.fm?p=${externalId}" width="100%" height="482" frameborder="0"></iframe>`
                 return (
                   <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
@@ -1261,7 +1293,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     </div>
                     <div className="mt-6 border border-[var(--rule)] rounded-[4px] overflow-hidden">
                       <iframe
-                        src={`https://playlist.megaphone.fm?p=${me.org.megaphoneRssUrl!.split('/').pop()}`}
+                        src={`https://playlist.megaphone.fm?p=${activeShow.megaphoneRssUrl!.split('/').pop()}`}
                         width="100%"
                         height="482"
                         frameBorder={0}
@@ -1271,7 +1303,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 )
               })()}
             </div>
-          )}
+            )
+          })()}
 
           {/* ── SETTINGS ──────────────────────────────────────────────── */}
           {activeNav === 'settings' && (
