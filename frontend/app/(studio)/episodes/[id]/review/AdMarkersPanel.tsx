@@ -109,7 +109,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       wsRef.current = ws
     })
     return () => { ws?.destroy() }
-  }, [audioUrl, episodeId])
+  }, [audioUrl, episodeId, campaigns.length])
 
   useEffect(() => {
     async function load() {
