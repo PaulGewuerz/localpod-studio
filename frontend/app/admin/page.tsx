@@ -6,6 +6,24 @@ import { supabase } from '@/lib/supabase'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
+const MONTHLY_CHAR_LIMIT = 150_000
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function CharBar({ used, limit = MONTHLY_CHAR_LIMIT }: { used: number; limit?: number }) {
+  const pct = Math.min(100, (used / limit) * 100)
+  const color = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-yellow-400' : 'bg-blue-500'
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-gray-500 shrink-0 font-mono">{used.toLocaleString()} / {limit.toLocaleString()}</span>
+    </div>
+  )
+}
 
 interface Voice { id: string; name: string; elevenLabsId: string }
 interface Show {
@@ -13,6 +31,11 @@ interface Show {
   name: string
   megaphoneShowId: string | null
   megaphoneRssUrl: string | null
+  episodeCount: number
+  totalChars: number
+  monthlyChars: number
+  lastEpisodeAt: string | null
+  lastEpisodeStatus: string | null
 }
 
 interface Publisher {
@@ -262,96 +285,77 @@ export default function AdminPage() {
         {publishers.length === 0 && !loadError && (
           <p className="text-sm text-gray-400">No publishers yet.</p>
         )}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {publishers.map(pub => {
             const edOrg = editingOrg[pub.id]
+            const totalMonthlyChars = pub.shows.reduce((sum, s) => sum + s.monthlyChars, 0)
             return (
-              <div key={pub.id} className="bg-white border border-gray-200 rounded-xl p-5">
+              <div key={pub.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 {/* Org header */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="px-5 py-4 flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900">{pub.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {pub.users.map(u => u.email).join(', ')}
-                    </p>
-                    <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
-                      <span>
-                        Voice: <span className="text-gray-900">{pub.defaultVoice?.name || '—'}</span>
-                      </span>
-                      <span>
-                        Status: <span className={`font-medium ${pub.subscription?.status === 'active' ? 'text-green-700' : 'text-yellow-600'}`}>
-                          {pub.subscription?.status ?? 'none'}
-                        </span>
+                    <div className="flex items-center gap-2.5">
+                      <p className="font-semibold text-gray-900">{pub.name}</p>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pub.subscription?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {pub.subscription?.status ?? 'none'}
                       </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{pub.users.map(u => u.email).join(', ')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Since {fmtDate(pub.createdAt)}</p>
                   </div>
-                  <div className="flex gap-3 shrink-0">
-                    {!edOrg && (
-                      <button onClick={() => startEditOrg(pub)} className="text-xs text-blue-600 hover:underline">Edit voice</button>
-                    )}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-gray-400 mb-0.5">This month</p>
+                    <p className="text-sm font-semibold text-gray-900">{totalMonthlyChars.toLocaleString()} chars</p>
+                    <p className="text-[10px] text-gray-400">{Math.round((totalMonthlyChars / MONTHLY_CHAR_LIMIT) * 100)}% of limit</p>
                   </div>
                 </div>
 
-                {/* Org-level edit (voice) */}
-                {edOrg && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Default voice</label>
-                      <select
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={edOrg.defaultVoiceId}
-                        onChange={e => setEditingOrg(prev => ({ ...prev, [pub.id]: { ...prev[pub.id], defaultVoiceId: e.target.value } }))}
-                      >
-                        <option value="">None</option>
-                        {voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-span-2 flex gap-2">
-                      <button
-                        onClick={() => handleSaveOrg(pub.id)}
-                        disabled={saving === pub.id}
-                        className="py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        {saving === pub.id ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => setEditingOrg(prev => { const next = { ...prev }; delete next[pub.id]; return next })}
-                        className="py-2 px-4 border border-gray-300 text-gray-600 text-sm rounded-lg hover:border-gray-400 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Shows */}
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Shows</p>
-                  {pub.shows.map(show => {
+                <div className="border-t border-gray-100">
+                  {pub.shows.map((show, i) => {
                     const edShow = editingShow[show.id]
                     return (
-                      <div key={show.id} className="border border-gray-100 rounded-lg p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-800">{show.name}</p>
-                            <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
-                              <span>Megaphone ID: <span className="font-mono text-gray-900">{show.megaphoneShowId || '—'}</span></span>
-                              {show.megaphoneRssUrl && (
-                                <button
-                                  onClick={() => copyRss(show.megaphoneRssUrl!, show.id)}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  {copied === show.id ? 'Copied!' : 'Copy RSS'}
-                                </button>
+                      <div key={show.id} className={`px-5 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="text-sm font-medium text-gray-800">{show.name}</p>
+                              {show.lastEpisodeStatus && (
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  last: {show.lastEpisodeStatus} {show.lastEpisodeAt ? fmtDate(show.lastEpisodeAt) : ''}
+                                </span>
                               )}
                             </div>
+                            <div className="grid grid-cols-3 gap-3 mb-2.5 text-xs">
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Episodes</p>
+                                <p className="font-semibold text-gray-800">{show.episodeCount}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Total chars</p>
+                                <p className="font-semibold text-gray-800">{show.totalChars.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400 mb-0.5">Megaphone ID</p>
+                                <p className="font-mono text-gray-800 truncate">{show.megaphoneShowId || '—'}</p>
+                              </div>
+                            </div>
+                            <CharBar used={show.monthlyChars} />
                           </div>
-                          {!edShow && (
-                            <button onClick={() => startEditShow(show)} className="text-xs text-blue-600 hover:underline shrink-0">Edit</button>
-                          )}
+                          <div className="flex gap-2 shrink-0 mt-0.5">
+                            {show.megaphoneRssUrl && (
+                              <button onClick={() => copyRss(show.megaphoneRssUrl!, show.id)} className="text-xs text-gray-400 hover:text-blue-600">
+                                {copied === show.id ? 'Copied!' : 'RSS'}
+                              </button>
+                            )}
+                            {!edShow && (
+                              <button onClick={() => startEditShow(show)} className="text-xs text-blue-600 hover:underline">Edit</button>
+                            )}
+                          </div>
                         </div>
+
                         {edShow && (
-                          <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">Megaphone show ID</label>
                               <input
@@ -369,17 +373,10 @@ export default function AdminPage() {
                               />
                             </div>
                             <div className="col-span-2 flex gap-2">
-                              <button
-                                onClick={() => handleSaveShow(pub.id, show.id)}
-                                disabled={saving === show.id}
-                                className="py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium rounded-lg transition-colors"
-                              >
+                              <button onClick={() => handleSaveShow(pub.id, show.id)} disabled={saving === show.id} className="py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium rounded-lg transition-colors">
                                 {saving === show.id ? 'Saving…' : 'Save'}
                               </button>
-                              <button
-                                onClick={() => setEditingShow(prev => { const next = { ...prev }; delete next[show.id]; return next })}
-                                className="py-1.5 px-4 border border-gray-300 text-gray-600 text-sm rounded-lg hover:border-gray-400 transition-colors"
-                              >
+                              <button onClick={() => setEditingShow(prev => { const next = { ...prev }; delete next[show.id]; return next })} className="py-1.5 px-4 border border-gray-300 text-gray-600 text-sm rounded-lg hover:border-gray-400 transition-colors">
                                 Cancel
                               </button>
                             </div>
@@ -389,38 +386,48 @@ export default function AdminPage() {
                     )
                   })}
 
-                  {/* Add show */}
-                  {addingShow[pub.id] !== undefined ? (
-                    <div className="flex gap-2 items-center">
-                      <input
-                        autoFocus
-                        className="flex-1 p-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Show name"
-                        value={addingShow[pub.id]}
-                        onChange={e => setAddingShow(prev => ({ ...prev, [pub.id]: e.target.value }))}
-                      />
-                      <button
-                        onClick={() => handleAddShow(pub.id)}
-                        disabled={saving === `add-${pub.id}`}
-                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        {saving === `add-${pub.id}` ? '…' : 'Add'}
-                      </button>
-                      <button
-                        onClick={() => setAddingShow(prev => { const next = { ...prev }; delete next[pub.id]; return next })}
-                        className="py-2 px-3 border border-gray-300 text-gray-600 text-sm rounded-lg hover:border-gray-400 transition-colors"
-                      >
-                        Cancel
-                      </button>
+                  {/* Add show + voice edit */}
+                  <div className="px-5 py-3 border-t border-gray-50 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {addingShow[pub.id] !== undefined ? (
+                        <>
+                          <input
+                            autoFocus
+                            className="p-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Show name"
+                            value={addingShow[pub.id]}
+                            onChange={e => setAddingShow(prev => ({ ...prev, [pub.id]: e.target.value }))}
+                          />
+                          <button onClick={() => handleAddShow(pub.id)} disabled={saving === `add-${pub.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-medium rounded-lg transition-colors">
+                            {saving === `add-${pub.id}` ? '…' : 'Add'}
+                          </button>
+                          <button onClick={() => setAddingShow(prev => { const next = { ...prev }; delete next[pub.id]; return next })} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setAddingShow(prev => ({ ...prev, [pub.id]: '' }))} className="text-xs text-blue-600 hover:underline">+ Add show</button>
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setAddingShow(prev => ({ ...prev, [pub.id]: '' }))}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      + Add show
-                    </button>
-                  )}
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      {edOrg ? (
+                        <>
+                          <select
+                            className="p-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={edOrg.defaultVoiceId}
+                            onChange={e => setEditingOrg(prev => ({ ...prev, [pub.id]: { defaultVoiceId: e.target.value } }))}
+                          >
+                            <option value="">No default voice</option>
+                            {voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          </select>
+                          <button onClick={() => handleSaveOrg(pub.id)} disabled={saving === pub.id} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-medium rounded-lg transition-colors">
+                            {saving === pub.id ? '…' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditingOrg(prev => { const next = { ...prev }; delete next[pub.id]; return next })} className="hover:text-gray-600">Cancel</button>
+                        </>
+                      ) : (
+                        <span>Voice: <button onClick={() => startEditOrg(pub)} className="text-blue-600 hover:underline">{pub.defaultVoice?.name || 'none'}</button></span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { supabase } = require('../supabase');
-// GET /admin/publishers — list all orgs
+// GET /admin/publishers — list all orgs with episode stats
 router.get('/publishers', async (req, res) => {
   const orgs = await prisma.organization.findMany({
     orderBy: { createdAt: 'desc' },
@@ -20,7 +20,50 @@ router.get('/publishers', async (req, res) => {
       },
     },
   });
-  res.json(orgs);
+
+  if (orgs.length === 0) return res.json([]);
+
+  const showIds = orgs.flatMap(o => o.shows.map(s => s.id));
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [totalStats, monthlyStats, latestEpisodes] = await Promise.all([
+    prisma.episode.groupBy({
+      by: ['showId'],
+      where: { showId: { in: showIds } },
+      _count: { id: true },
+      _sum: { characterCount: true },
+    }),
+    prisma.episode.groupBy({
+      by: ['showId'],
+      where: { showId: { in: showIds }, createdAt: { gte: startOfMonth } },
+      _sum: { characterCount: true },
+    }),
+    prisma.episode.findMany({
+      where: { showId: { in: showIds } },
+      orderBy: { createdAt: 'desc' },
+      select: { showId: true, createdAt: true, status: true },
+      distinct: ['showId'],
+    }),
+  ]);
+
+  const totalByShow = Object.fromEntries(totalStats.map(s => [s.showId, { count: s._count.id, chars: s._sum.characterCount ?? 0 }]));
+  const monthlyByShow = Object.fromEntries(monthlyStats.map(s => [s.showId, s._sum.characterCount ?? 0]));
+  const lastEpByShow = Object.fromEntries(latestEpisodes.map(e => [e.showId, { at: e.createdAt, status: e.status }]));
+
+  const result = orgs.map(org => ({
+    ...org,
+    shows: org.shows.map(show => ({
+      ...show,
+      episodeCount: totalByShow[show.id]?.count ?? 0,
+      totalChars: totalByShow[show.id]?.chars ?? 0,
+      monthlyChars: monthlyByShow[show.id] ?? 0,
+      lastEpisodeAt: lastEpByShow[show.id]?.at ?? null,
+      lastEpisodeStatus: lastEpByShow[show.id]?.status ?? null,
+    })),
+  }));
+
+  res.json(result);
 });
 
 // POST /admin/publishers — create org + user + show + trial subscription + Megaphone show + send magic link
