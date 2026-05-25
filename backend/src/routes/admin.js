@@ -172,6 +172,29 @@ router.post('/publishers/:orgId/shows', async (req, res) => {
   res.status(201).json({ show });
 });
 
+// POST /admin/publishers/:orgId/users — add a user to an existing org
+router.post('/publishers/:orgId/users', async (req, res) => {
+  const { orgId } = req.params;
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return res.status(409).json({ error: 'A user with that email already exists' });
+
+  const user = await prisma.user.create({
+    data: { email, name: email.split('@')[0], organizationId: orgId },
+  });
+
+  supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+    .then(({ error }) => { if (error) console.error('Magic link error:', error.message); })
+    .catch(err => console.error('Magic link error:', err.message));
+
+  res.status(201).json({ user });
+});
+
 // PATCH /admin/publishers/:orgId/directories — set directory submission statuses
 router.patch('/publishers/:orgId/directories', async (req, res) => {
   const { orgId } = req.params;

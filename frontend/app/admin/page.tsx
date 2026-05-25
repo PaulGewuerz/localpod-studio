@@ -71,6 +71,7 @@ export default function AdminPage() {
   const [editingOrg, setEditingOrg] = useState<Record<string, { defaultVoiceId: string }>>({})
   const [editingShow, setEditingShow] = useState<Record<string, { megaphoneShowId: string; megaphoneRssUrl: string }>>({})
   const [addingShow, setAddingShow] = useState<Record<string, string>>({}) // orgId → new show name
+  const [addingUser, setAddingUser] = useState<Record<string, string>>({}) // orgId → new user email
   const [saving, setSaving] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -178,6 +179,28 @@ export default function AdminPage() {
       await loadData(token)
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function handleAddUser(orgId: string) {
+    const email = addingUser[orgId]?.trim()
+    if (!email) return
+    setSaving(`add-user-${orgId}`)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      setAddingUser(prev => { const next = { ...prev }; delete next[orgId]; return next })
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to add user')
     } finally {
       setSaving(null)
     }
@@ -302,6 +325,25 @@ export default function AdminPage() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{pub.users.map(u => u.email).join(', ')}</p>
+                    {addingUser[pub.id] !== undefined ? (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <input
+                          autoFocus
+                          type="email"
+                          className="p-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="user@example.com"
+                          value={addingUser[pub.id]}
+                          onChange={e => setAddingUser(prev => ({ ...prev, [pub.id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddUser(pub.id) }}
+                        />
+                        <button onClick={() => handleAddUser(pub.id)} disabled={saving === `add-user-${pub.id}`} className="py-1 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-medium rounded-lg transition-colors">
+                          {saving === `add-user-${pub.id}` ? '…' : 'Add'}
+                        </button>
+                        <button onClick={() => setAddingUser(prev => { const next = { ...prev }; delete next[pub.id]; return next })} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setAddingUser(prev => ({ ...prev, [pub.id]: '' }))} className="text-xs text-blue-600 hover:underline mt-1">+ Add user</button>
+                    )}
                     <p className="text-xs text-gray-400 mt-0.5">Since {fmtDate(pub.createdAt)}</p>
                   </div>
                   <div className="text-right shrink-0">
