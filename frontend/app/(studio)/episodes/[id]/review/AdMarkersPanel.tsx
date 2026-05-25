@@ -49,6 +49,10 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [waveReady, setWaveReady] = useState(false)
+  // Only initialize WaveSurfer once the user actually needs mid-roll placement
+  const [waveEnabled, setWaveEnabled] = useState(() =>
+    initialAssignments.some(a => a.type === 'mid-roll')
+  )
 
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([])
   const [assignments, setAssignments] = useState<Map<string, AdAssignment>>(() => {
@@ -61,7 +65,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !audioUrl) return
+    if (!containerRef.current || !audioUrl || !waveEnabled) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let ws: any = null
     import('wavesurfer.js').then(({ default: WaveSurfer }) => {
@@ -84,7 +88,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       wsRef.current = ws
     })
     return () => { ws?.destroy() }
-  }, [audioUrl])
+  }, [audioUrl, waveEnabled])
 
   useEffect(() => {
     async function load() {
@@ -132,6 +136,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
 
   function setAssignmentType(campaignId: string, type: string) {
     setSaved(false)
+    if (type === 'mid-roll') setWaveEnabled(true)
     setAssignments(prev => {
       const next = new Map(prev)
       const existing = next.get(campaignId)
