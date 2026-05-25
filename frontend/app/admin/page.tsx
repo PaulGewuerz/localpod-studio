@@ -41,6 +41,7 @@ interface Show {
 interface Publisher {
   id: string
   name: string
+  createdAt: string
   defaultVoice: { id: string; name: string } | null
   users: { id: string; email: string }[]
   subscription: { status: string; plan: string | null } | null
