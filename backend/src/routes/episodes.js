@@ -14,6 +14,12 @@ router.get('/', async (req, res) => {
   const orgId = req.user.organization.id;
   const { showId } = req.query;
 
+  // Load shows so we know which have Megaphone IDs
+  const shows = await prisma.show.findMany({
+    where: showId ? { id: showId, organizationId: orgId } : { organizationId: orgId },
+    select: { id: true, megaphoneShowId: true },
+  });
+
   const episodes = await prisma.episode.findMany({
     where: showId
       ? { showId, show: { organizationId: orgId } }
@@ -31,11 +37,12 @@ router.get('/', async (req, res) => {
       adAssignments: true,
       scheduledAt: true,
       createdAt: true,
+      showId: true,
       voice: { select: { name: true } },
     },
   });
 
-  // Lazily flip scheduled → published for episodes whose pubdate has passed (or has no recorded pubdate)
+  // Lazily flip scheduled → published for episodes whose pubdate has passed
   const now = new Date();
   const toFlip = episodes.filter(e => e.status === 'scheduled' && (!e.scheduledAt || new Date(e.scheduledAt) <= now));
   if (toFlip.length > 0) {
@@ -46,7 +53,46 @@ router.get('/', async (req, res) => {
     toFlip.forEach(e => { e.status = 'published'; });
   }
 
-  res.json(episodes);
+  // Fetch Megaphone episodes and surface any not yet in LocalPod
+  const knownMegaphoneIds = new Set(episodes.map(e => e.megaphoneEpisodeId).filter(Boolean));
+  const adapter = getHostingAdapter();
+  const megaphoneRows = [];
+
+  for (const show of shows) {
+    if (!show.megaphoneShowId) continue;
+    try {
+      const remote = await adapter.getEpisodes(show.megaphoneShowId);
+      for (const ep of remote) {
+        if (knownMegaphoneIds.has(ep.id)) continue; // already in DB
+        const playerUrl = ep.uid ? `https://playlist.megaphone.fm?e=${ep.uid}` : null;
+        megaphoneRows.push({
+          id: `megaphone-${ep.id}`,
+          title: ep.title || 'Untitled',
+          status: 'published',
+          audioUrl: null,
+          publishedUrl: playerUrl,
+          characterCount: null,
+          megaphoneEpisodeId: ep.id,
+          adMarkers: null,
+          adAssignments: null,
+          scheduledAt: ep.pubdate || null,
+          createdAt: ep.pubdate || ep.createdAt || new Date().toISOString(),
+          showId: show.id,
+          voice: null,
+          source: 'megaphone',
+        });
+      }
+    } catch (err) {
+      console.warn(`Megaphone episode fetch failed for show ${show.megaphoneShowId}:`, err.message);
+    }
+  }
+
+  // Merge: DB episodes first, then Megaphone-only, sorted by date descending
+  const all = [...episodes, ...megaphoneRows].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  res.json(all);
 });
 
 // GET /episodes/:id — fetch a single episode by ID

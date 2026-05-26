@@ -28,6 +28,7 @@ interface Episode {
   scheduledAt: string | null
   createdAt: string
   voice: { name: string } | null
+  source?: 'megaphone'
 }
 
 
@@ -188,11 +189,20 @@ function EpisodeTable({ episodes, onNew, onDelete }: {
             <tr key={ep.id} className="hover:bg-[var(--bg)] group">
               {onDelete && (
                 <td className="w-8 px-3 py-3 border-b border-[var(--rule)]">
-                  <input type="checkbox" checked={selected.has(ep.id)} onChange={() => toggle(ep.id)} className="cursor-pointer" />
+                  {ep.source !== 'megaphone' && (
+                    <input type="checkbox" checked={selected.has(ep.id)} onChange={() => toggle(ep.id)} className="cursor-pointer" />
+                  )}
                 </td>
               )}
               <td className="px-4 py-3 border-b border-[var(--rule)]">
-                <a href={`/episodes/${ep.id}/review`} className="font-medium text-[13px] text-[var(--ink)] hover:text-[var(--accent)] transition-colors">{ep.title}</a>
+                {ep.source === 'megaphone' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-[13px] text-[var(--ink)]">{ep.title}</span>
+                    <span className="text-[10px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] bg-[var(--bg-warm)] px-1.5 py-0.5 rounded-[2px]">imported</span>
+                  </div>
+                ) : (
+                  <a href={`/episodes/${ep.id}/review`} className="font-medium text-[13px] text-[var(--ink)] hover:text-[var(--accent)] transition-colors">{ep.title}</a>
+                )}
               </td>
               <td className="hidden sm:table-cell px-4 py-3 border-b border-[var(--rule)] text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
                 {ep.status === 'draft' ? '—' : ep.scheduledAt ? fmtDate(ep.scheduledAt) : fmtDate(ep.createdAt)}
