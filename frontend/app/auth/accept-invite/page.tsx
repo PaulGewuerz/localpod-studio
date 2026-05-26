@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useSearchParams, Suspense } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 function AcceptInviteInner() {
