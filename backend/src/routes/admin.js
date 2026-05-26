@@ -100,10 +100,10 @@ router.post('/publishers', async (req, res) => {
     },
   });
 
-  // Send magic link — fire and forget so a slow Supabase response doesn't block the HTTP reply
-  supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
-    .then(({ error }) => { if (error) console.error('Magic link error:', error.message); })
-    .catch(err => console.error('Magic link error:', err.message));
+  // Send invite email so user sets their own password — fire and forget
+  supabaseAdmin.auth.admin.inviteUserByEmail(email)
+    .then(({ error }) => { if (error) console.error('Invite error:', error.message); })
+    .catch(err => console.error('Invite error:', err.message));
 
   res.status(201).json({ org, ...(warnings.length ? { warnings } : {}) });
 });
@@ -188,9 +188,9 @@ router.post('/publishers/:orgId/users', async (req, res) => {
     data: { email, name: email.split('@')[0], organizationId: orgId },
   });
 
-  supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
-    .then(({ error }) => { if (error) console.error('Magic link error:', error.message); })
-    .catch(err => console.error('Magic link error:', err.message));
+  supabaseAdmin.auth.admin.inviteUserByEmail(email)
+    .then(({ error }) => { if (error) console.error('Invite error:', error.message); })
+    .catch(err => console.error('Invite error:', err.message));
 
   res.status(201).json({ user });
 });
