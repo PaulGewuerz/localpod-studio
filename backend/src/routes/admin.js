@@ -195,6 +195,21 @@ router.post('/publishers/:orgId/users', async (req, res) => {
   res.status(201).json({ user });
 });
 
+// POST /admin/publishers/:orgId/activate — manually activate a subscription
+router.post('/publishers/:orgId/activate', async (req, res) => {
+  const { orgId } = req.params;
+
+  const subscription = await prisma.subscription.findUnique({ where: { organizationId: orgId } });
+  if (!subscription) return res.status(404).json({ error: 'Subscription not found' });
+
+  const updated = await prisma.subscription.update({
+    where: { organizationId: orgId },
+    data: { status: 'active' },
+  });
+
+  res.json({ subscription: updated });
+});
+
 // PATCH /admin/publishers/:orgId/directories — set directory submission statuses
 router.patch('/publishers/:orgId/directories', async (req, res) => {
   const { orgId } = req.params;

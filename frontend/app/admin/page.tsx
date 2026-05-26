@@ -74,6 +74,7 @@ export default function AdminPage() {
   const [addingUser, setAddingUser] = useState<Record<string, string>>({}) // orgId → new user email
   const [saving, setSaving] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [activating, setActivating] = useState<string | null>(null)
 
 
   useEffect(() => {
@@ -181,6 +182,24 @@ export default function AdminPage() {
       alert(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSaving(null)
+    }
+  }
+
+  async function handleActivate(orgId: string) {
+    setActivating(orgId)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Activation failed')
+    } finally {
+      setActivating(null)
     }
   }
 
@@ -323,6 +342,15 @@ export default function AdminPage() {
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${pub.subscription?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {pub.subscription?.status ?? 'none'}
                       </span>
+                      {pub.subscription?.status !== 'active' && (
+                        <button
+                          onClick={() => handleActivate(pub.id)}
+                          disabled={activating === pub.id}
+                          className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50 transition-colors"
+                        >
+                          {activating === pub.id ? '…' : 'Activate'}
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{pub.users.map(u => u.email).join(', ')}</p>
                     {addingUser[pub.id] !== undefined ? (
