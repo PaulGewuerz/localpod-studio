@@ -185,6 +185,26 @@ export default function AdminPage() {
     }
   }
 
+  async function handleDeleteUser(orgId: string, userId: string, email: string) {
+    if (!window.confirm(`Remove ${email} from this org?`)) return
+    if (!window.confirm(`Are you sure? This will delete their login permanently.`)) return
+    setSaving(`del-user-${userId}`)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}/users/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setSaving(null)
+    }
+  }
+
   async function handleActivate(orgId: string) {
     setActivating(orgId)
     try {
@@ -352,7 +372,21 @@ export default function AdminPage() {
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{pub.users.map(u => u.email).join(', ')}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      {pub.users.map(u => (
+                        <span key={u.id} className="flex items-center gap-1 text-xs text-gray-500">
+                          {u.email}
+                          <button
+                            onClick={() => handleDeleteUser(pub.id, u.id, u.email)}
+                            disabled={saving === `del-user-${u.id}`}
+                            className="text-gray-300 hover:text-red-500 disabled:opacity-50 transition-colors leading-none"
+                            title="Remove user"
+                          >
+                            {saving === `del-user-${u.id}` ? '…' : '×'}
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                     {addingUser[pub.id] !== undefined ? (
                       <div className="flex items-center gap-2 mt-1.5">
                         <input

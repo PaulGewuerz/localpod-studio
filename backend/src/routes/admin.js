@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
-const { supabase } = require('../supabase');
+const { supabase, supabaseAdmin } = require('../supabase');
 // GET /admin/publishers — list all orgs with episode stats
 router.get('/publishers', async (req, res) => {
   const orgs = await prisma.organization.findMany({
@@ -193,6 +193,28 @@ router.post('/publishers/:orgId/users', async (req, res) => {
     .catch(err => console.error('Magic link error:', err.message));
 
   res.status(201).json({ user });
+});
+
+// DELETE /admin/publishers/:orgId/users/:userId — remove a user from an org
+router.delete('/publishers/:orgId/users/:userId', async (req, res) => {
+  const { orgId, userId } = req.params;
+
+  const user = await prisma.user.findFirst({ where: { id: userId, organizationId: orgId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Delete from DB first
+  await prisma.user.delete({ where: { id: userId } });
+
+  // Delete from Supabase auth — look up by email
+  const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+  if (!error) {
+    const authUser = users.find(u => u.email === user.email);
+    if (authUser) {
+      await supabaseAdmin.auth.admin.deleteUser(authUser.id);
+    }
+  }
+
+  res.json({ deleted: true });
 });
 
 // POST /admin/publishers/:orgId/activate — manually activate a subscription
