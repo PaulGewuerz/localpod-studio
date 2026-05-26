@@ -281,37 +281,45 @@ function AnalyticsView({ showId }: { showId: string | null }) {
   }
 
   const episodes = data.episodes ?? []
+  const hasDownloadData = (data.totalDownloads ?? 0) > 0 || episodes.some(e => e.downloads > 0)
   const maxDownloads = Math.max(...episodes.map(e => e.downloads), 1)
 
   return (
     <div>
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Total Downloads</div>
-          <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
-            {(data.totalDownloads ?? 0).toLocaleString()}
+      {hasDownloadData && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Total Downloads</div>
+            <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
+              {(data.totalDownloads ?? 0).toLocaleString()}
+            </div>
+            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">All time</div>
           </div>
-          <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">All time</div>
-        </div>
-        <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Episodes</div>
-          <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">{episodes.length}</div>
-          <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Published</div>
-        </div>
-        <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Avg Downloads</div>
-          <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
-            {episodes.length ? Math.round((data.totalDownloads ?? 0) / episodes.length).toLocaleString() : '—'}
+          <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Episodes</div>
+            <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">{episodes.length}</div>
+            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Published</div>
           </div>
-          <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Per episode</div>
+          <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Avg Downloads</div>
+            <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
+              {episodes.length ? Math.round((data.totalDownloads ?? 0) / episodes.length).toLocaleString() : '—'}
+            </div>
+            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Per episode</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Episode breakdown */}
       <div className="bg-white border border-[var(--rule)] rounded-[2px]">
-        <div className="px-5 py-4 border-b border-[var(--rule)] font-[family-name:var(--font-nunito)] font-bold text-[14px] text-[var(--ink)]">
-          Downloads by Episode
+        <div className="px-5 py-4 border-b border-[var(--rule)] flex items-baseline justify-between">
+          <span className="font-[family-name:var(--font-nunito)] font-bold text-[14px] text-[var(--ink)]">
+            {hasDownloadData ? 'Downloads by Episode' : 'Episodes'}
+          </span>
+          {!hasDownloadData && (
+            <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Download stats unavailable</span>
+          )}
         </div>
         {episodes.length === 0 ? (
           <p className="px-5 py-8 text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No episodes yet.</p>
@@ -326,16 +334,20 @@ function AnalyticsView({ showId }: { showId: string | null }) {
                     <div className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] mt-0.5">
                       {ep.pubdate ? fmtDate(ep.pubdate) : '—'}
                     </div>
-                    <div className="mt-1.5 h-1.5 bg-[var(--bg-warm)] rounded-full overflow-hidden w-full max-w-xs">
-                      <div
-                        className="h-full bg-[var(--accent)] rounded-full"
-                        style={{ width: `${(ep.downloads / maxDownloads) * 100}%` }}
-                      />
+                    {hasDownloadData && (
+                      <div className="mt-1.5 h-1.5 bg-[var(--bg-warm)] rounded-full overflow-hidden w-full max-w-xs">
+                        <div
+                          className="h-full bg-[var(--accent)] rounded-full"
+                          style={{ width: `${(ep.downloads / maxDownloads) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {hasDownloadData && (
+                    <div className="text-[13px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-light)] shrink-0">
+                      {ep.downloads.toLocaleString()}
                     </div>
-                  </div>
-                  <div className="text-[13px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-light)] shrink-0">
-                    {ep.downloads.toLocaleString()}
-                  </div>
+                  )}
                 </>
               )
               return ep.id ? (

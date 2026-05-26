@@ -201,10 +201,25 @@ class MegaphoneAdapter {
    */
   async getPodcastStats(podcastId, { from, to } = {}) {
     const params = new URLSearchParams();
-    if (from) params.set('from', from);
-    if (to)   params.set('to', to);
+    if (from) params.set('startDate', from);
+    if (to)   params.set('endDate', to);
     const qs = params.toString() ? `?${params}` : '';
-    return this.#request('GET', `${this.#podcastPath(podcastId)}/statistics${qs}`);
+    // Try known Megaphone analytics endpoint variations
+    const paths = [
+      `/networks/${this.networkId}/podcasts/${podcastId}/downloads${qs}`,
+      `/networks/${this.networkId}/podcasts/${podcastId}/analytics${qs}`,
+      `/networks/${this.networkId}/podcasts/${podcastId}/metrics${qs}`,
+    ];
+    for (const path of paths) {
+      try {
+        const data = await this.#request('GET', path);
+        console.log(`Stats endpoint worked: ${path}`);
+        return data;
+      } catch (err) {
+        if (err.status !== 404) throw err;
+      }
+    }
+    throw Object.assign(new Error('No stats endpoint found'), { status: 404 });
   }
 
   /**
