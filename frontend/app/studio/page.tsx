@@ -389,6 +389,7 @@ function StudioInner() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const settingsCoverRef = useRef<HTMLInputElement>(null)
+  const settingsDescriptionRef = useRef<HTMLDivElement>(null)
 
   // Voice preview
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null)
@@ -497,8 +498,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     if (activeNav === 'settings' && activeShow) {
       setSettingsName(activeShow.name ?? '')
       const raw = activeShow.description ?? ''
-      const stripped = raw.includes('<') ? new DOMParser().parseFromString(raw, 'text/html').body.innerText : raw
-      setSettingsDescription(stripped)
+      setSettingsDescription(raw)
+      if (settingsDescriptionRef.current) settingsDescriptionRef.current.innerHTML = raw
       setSettingsCoverPreview(activeShow.coverArtUrl ?? null)
       setSettingsCoverFile(null)
       setSettingsError(null)
@@ -714,6 +715,20 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       a.rel = 'noreferrer noopener'
     })
     setShowNotes(div.innerHTML)
+  }
+
+  function insertDescriptionLink() {
+    const div = settingsDescriptionRef.current
+    if (!div) return
+    const url = window.prompt('URL:', 'https://')
+    if (!url) return
+    div.focus()
+    document.execCommand('createLink', false, url)
+    div.querySelectorAll('a').forEach(a => {
+      a.target = '_blank'
+      a.rel = 'noreferrer noopener'
+    })
+    setSettingsDescription(div.innerHTML)
   }
 
   function toggleVoicePreview(voice: Voice) {
@@ -1369,14 +1384,29 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
               {/* Description */}
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
-                <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
-                  Show Description
-                </label>
-                <textarea
-                  value={settingsDescription}
-                  onChange={e => setSettingsDescription(e.target.value)}
-                  rows={4}
-                  className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] resize-none"
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em]">
+                    Show Description
+                  </label>
+                  <button
+                    type="button"
+                    onClick={insertDescriptionLink}
+                    className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] border border-[var(--rule)] rounded-[2px] px-2 py-0.5 transition-colors"
+                  >
+                    + Link
+                  </button>
+                </div>
+                <div
+                  ref={settingsDescriptionRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={() => setSettingsDescription(settingsDescriptionRef.current?.innerHTML ?? '')}
+                  onClick={e => {
+                    const link = (e.target as HTMLElement).closest('a')
+                    if (link) { e.preventDefault(); window.open(link.getAttribute('href') ?? '', '_blank', 'noreferrer') }
+                  }}
+                  className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] min-h-[100px] leading-relaxed cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
+                  data-placeholder="Describe your podcast…"
                 />
               </div>
 
