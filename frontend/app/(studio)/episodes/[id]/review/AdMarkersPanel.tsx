@@ -76,6 +76,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  const hasMidRollAssigned = [...assignments.values()].some(a => a.type === 'mid-roll')
+
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,7 +226,6 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   }
 
   const activeCampaigns = campaigns.filter(c => c.audioUrl)
-  const hasMidRollAssigned = [...assignments.values()].some(a => a.type === 'mid-roll')
 
   return (
     <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6 flex flex-col gap-4">
