@@ -10,24 +10,23 @@ function AcceptInviteInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Check query params first, then hash fragment
-  let tokenHash = searchParams.get('token_hash')
-  let type = searchParams.get('type')
+  // Parse hash fragment — Supabase sends access_token + refresh_token for invites
+  const hashParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.hash.slice(1))
+    : new URLSearchParams()
 
-  if (!tokenHash && typeof window !== 'undefined' && window.location.hash) {
-    const hashParams = new URLSearchParams(window.location.hash.slice(1))
-    tokenHash = tokenHash || hashParams.get('token_hash')
-    type = type || hashParams.get('type')
-  }
+  const accessToken = hashParams.get('access_token')
+  const refreshToken = hashParams.get('refresh_token')
+  const type = hashParams.get('type') || searchParams.get('type')
+  const tokenHash = searchParams.get('token_hash')
 
-  if (!tokenHash || type !== 'invite') {
+  const isValid = type === 'invite' && (accessToken || tokenHash)
+
+  if (!isValid) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-full max-w-sm text-center">
           <p className="text-red-600 mb-4">Invalid invite link.</p>
-          <p className="text-xs text-gray-400 mt-2 font-mono break-all">
-            {typeof window !== 'undefined' ? window.location.search + window.location.hash : ''}
-          </p>
           <a href="/login" className="text-sm text-black font-medium hover:underline mt-4 block">Back to login</a>
         </div>
       </main>
@@ -37,8 +36,20 @@ function AcceptInviteInner() {
   async function handleAccept() {
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: 'invite' })
-    if (error) {
+
+    let err: { message: string } | null = null
+
+    if (accessToken && refreshToken) {
+      // Old Supabase format: access_token + refresh_token in hash
+      const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      err = error
+    } else if (tokenHash) {
+      // New Supabase PKCE format: token_hash in query params
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' })
+      err = error
+    }
+
+    if (err) {
       setError('This invite link has expired or already been used. Ask your account manager to resend it.')
       setLoading(false)
       return
