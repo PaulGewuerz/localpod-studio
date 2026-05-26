@@ -29,6 +29,9 @@ router.get('/', async (req, res) => {
     });
     const internalIdByMegaphone = Object.fromEntries(dbEpisodes.map(e => [e.megaphoneEpisodeId, e.id]));
 
+    // Log first episode to inspect field names
+    if (episodes?.length) console.log('Megaphone episode sample:', JSON.stringify(episodes[0]));
+
     // Normalize — Megaphone returns downloads as `totalDownloads` or `downloads`
     const normalized = (Array.isArray(episodes) ? episodes : []).map(ep => ({
       id: internalIdByMegaphone[ep.id] ?? null,  // our internal DB id (for linking)
