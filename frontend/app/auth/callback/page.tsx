@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -12,6 +13,10 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     async function handleSession(session: import('@supabase/supabase-js').Session) {
+      if (ADMIN_EMAIL && session.user.email === ADMIN_EMAIL) {
+        router.replace('/admin')
+        return
+      }
       setDebugInfo('Session found, checking /me…')
       try {
         const res = await fetch(`${API_URL}/me`, {
@@ -27,9 +32,22 @@ export default function AuthCallbackPage() {
     }
 
     async function handleCallback() {
-      const code = new URLSearchParams(window.location.search).get('code')
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const tokenHash = params.get('token_hash')
+      const type = params.get('type')
       const hash = window.location.hash
-      setDebugInfo(`code=${!!code} hash=${!!hash}`)
+      setDebugInfo(`code=${!!code} token_hash=${!!tokenHash} type=${type} hash=${!!hash}`)
+
+      // Invite link — exchange token then send to set-password page
+      if (tokenHash && type === 'invite') {
+        setDebugInfo('Exchanging invite token…')
+        const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' })
+        setDebugInfo(`verifyOtp: session=${!!data?.session} error=${error?.message ?? 'none'}`)
+        if (error || !data.session) { router.replace('/login'); return }
+        router.replace('/auth/reset-password')
+        return
+      }
 
       if (code) {
         setDebugInfo('Exchanging code for session…')

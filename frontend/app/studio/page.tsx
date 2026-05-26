@@ -43,7 +43,7 @@ interface ShowData {
 interface MeData {
   org: { id: string; name: string; defaultVoice: Voice | null }
   shows: ShowData[]
-  subscription: { stripeCustomerId: string | null } | null
+  subscription: { stripeCustomerId: string | null; status: string } | null
 }
 
 type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings' | 'ads'
@@ -447,7 +447,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           subscription = meData!.subscription
           if (subscription?.stripeCustomerId) break
         }
-        if (!subscription?.stripeCustomerId) { router.replace('/onboarding'); return }
+        const activeStatuses = ['active', 'trial']
+        if (!subscription?.status || !activeStatuses.includes(subscription.status)) { router.replace('/onboarding'); return }
 
         setMe(meData)
         if (meData!.shows.length > 0) setActiveShowId(meData!.shows[0].id)
