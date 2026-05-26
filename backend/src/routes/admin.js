@@ -195,6 +195,48 @@ router.post('/publishers/:orgId/users', async (req, res) => {
   res.status(201).json({ user });
 });
 
+// DELETE /admin/publishers/:orgId — delete an org and everything under it
+router.delete('/publishers/:orgId', async (req, res) => {
+  const { orgId } = req.params;
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    include: { users: true, shows: true },
+  });
+  if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+  // Delete episodes for all shows
+  const showIds = org.shows.map(s => s.id);
+  if (showIds.length) {
+    await prisma.episode.deleteMany({ where: { showId: { in: showIds } } });
+    await prisma.show.deleteMany({ where: { id: { in: showIds } } });
+  }
+
+  // Delete subscription
+  await prisma.subscription.deleteMany({ where: { organizationId: orgId } });
+
+  // Delete users from DB
+  await prisma.user.deleteMany({ where: { organizationId: orgId } });
+
+  // Delete org
+  await prisma.organization.delete({ where: { id: orgId } });
+
+  // Delete Supabase auth accounts for all users
+  if (org.users.length) {
+    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+    if (!error) {
+      const emails = new Set(org.users.map(u => u.email));
+      for (const authUser of users) {
+        if (emails.has(authUser.email)) {
+          await supabaseAdmin.auth.admin.deleteUser(authUser.id);
+        }
+      }
+    }
+  }
+
+  res.json({ deleted: true });
+});
+
 // DELETE /admin/publishers/:orgId/users/:userId — remove a user from an org
 router.delete('/publishers/:orgId/users/:userId', async (req, res) => {
   const { orgId, userId } = req.params;

@@ -185,6 +185,26 @@ export default function AdminPage() {
     }
   }
 
+  async function handleDeleteOrg(orgId: string, orgName: string) {
+    if (!window.confirm(`Delete "${orgName}" and all its data?`)) return
+    if (!window.confirm(`This will permanently delete all shows, episodes, and user logins for "${orgName}". Cannot be undone.`)) return
+    setSaving(`del-org-${orgId}`)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setSaving(null)
+    }
+  }
+
   async function handleDeleteUser(orgId: string, userId: string, email: string) {
     if (!window.confirm(`Remove ${email} from this org?`)) return
     if (!window.confirm(`Are you sure? This will delete their login permanently.`)) return
@@ -371,6 +391,13 @@ export default function AdminPage() {
                           {activating === pub.id ? '…' : 'Activate'}
                         </button>
                       )}
+                      <button
+                        onClick={() => handleDeleteOrg(pub.id, pub.name)}
+                        disabled={saving === `del-org-${pub.id}`}
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-50 transition-colors ml-auto"
+                      >
+                        {saving === `del-org-${pub.id}` ? '…' : 'Delete org'}
+                      </button>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       {pub.users.map(u => (
