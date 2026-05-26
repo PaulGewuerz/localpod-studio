@@ -14,7 +14,20 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    // Supabase puts access_token + refresh_token in the hash for password recovery
+    const searchParams = new URLSearchParams(window.location.search)
+    const tokenHash = searchParams.get('token_hash')
+    const type = searchParams.get('type') as 'invite' | 'recovery' | null
+
+    // Newer Supabase: token_hash in query params
+    if (tokenHash && type) {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
+        if (error) { setSessionError('Invalid or expired link. Please request a new one.'); return }
+        setReady(true)
+      })
+      return
+    }
+
+    // Older Supabase: access_token + refresh_token in hash fragment
     const hash = window.location.hash
     if (hash) {
       const params = new URLSearchParams(hash.slice(1))
@@ -22,16 +35,17 @@ export default function ResetPasswordPage() {
       const refresh_token = params.get('refresh_token')
       if (access_token && refresh_token) {
         supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
-          if (error) { setSessionError('Invalid or expired reset link. Please request a new one.'); return }
+          if (error) { setSessionError('Invalid or expired link. Please request a new one.'); return }
           setReady(true)
         })
         return
       }
     }
-    // No hash — check for existing session (e.g. page refresh)
+
+    // No token — check for existing session (e.g. page refresh)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) { setReady(true); return }
-      setSessionError('Invalid or expired reset link. Please request a new one.')
+      setSessionError('Invalid or expired link. Please request a new one.')
     })
   }, [])
 
