@@ -1260,7 +1260,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       {show.name}
                     </div>
                     {show.description ? (
-                      <p className="text-[13px] text-[var(--ink-light)] leading-relaxed">{show.description}</p>
+                      <p className="text-[13px] text-[var(--ink-light)] leading-relaxed" dangerouslySetInnerHTML={{ __html: show.description }} />
                     ) : (
                       <p className="text-[13px] text-[var(--ink-faint)] italic">No description yet.</p>
                     )}
