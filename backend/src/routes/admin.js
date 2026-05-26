@@ -103,7 +103,7 @@ router.post('/publishers', async (req, res) => {
 
   // Send invite email so user sets their own password — fire and forget
   supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/auth/reset-password`,
+    redirectTo: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/auth/accept-invite`,
   })
     .then(({ error }) => { if (error) console.error('Invite error:', error.message); })
     .catch(err => console.error('Invite error:', err.message));
@@ -192,7 +192,7 @@ router.post('/publishers/:orgId/users', async (req, res) => {
   });
 
   supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/auth/reset-password`,
+    redirectTo: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/auth/accept-invite`,
   })
     .then(({ error }) => { if (error) console.error('Invite error:', error.message); })
     .catch(err => console.error('Invite error:', err.message));
