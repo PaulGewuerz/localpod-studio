@@ -111,6 +111,14 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
     return () => { ws?.destroy() }
   }, [audioUrl, episodeId, campaigns.length])
 
+  // When the waveform div becomes visible, WaveSurfer needs to recalculate
+  // its canvas dimensions (they were 0 while the container was display:none)
+  useEffect(() => {
+    if (hasMidRollAssigned && wsRef.current) {
+      window.dispatchEvent(new Event('resize'))
+    }
+  }, [hasMidRollAssigned])
+
   useEffect(() => {
     async function load() {
       try {
