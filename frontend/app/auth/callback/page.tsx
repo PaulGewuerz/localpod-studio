@@ -24,7 +24,8 @@ export default function AuthCallbackPage() {
         })
         if (!res.ok) { setDebugInfo('/me returned ' + res.status + ', going to onboarding'); router.replace('/onboarding'); return }
         const { subscription } = await res.json()
-        if (!subscription?.stripeCustomerId) { setDebugInfo('No subscription, going to onboarding'); router.replace('/onboarding'); return }
+        const activeStatuses = ['active', 'trial']
+        if (!subscription?.status || !activeStatuses.includes(subscription.status)) { setDebugInfo('No active subscription, going to onboarding'); router.replace('/onboarding'); return }
       } catch (e) {
         setDebugInfo('/me fetch error: ' + String(e)); router.replace('/onboarding'); return
       }
