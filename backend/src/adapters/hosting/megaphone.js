@@ -76,6 +76,8 @@ class MegaphoneAdapter {
    */
   async getPodcast(podcastId) {
     const data = await this.#request('GET', this.#podcastPath(podcastId));
+    console.log('Megaphone podcast raw keys:', Object.keys(data));
+    console.log('Megaphone podcast raw:', JSON.stringify(data));
     return {
       title: data.title || null,
       summary: data.summary || null,

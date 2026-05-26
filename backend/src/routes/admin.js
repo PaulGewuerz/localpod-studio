@@ -210,6 +210,7 @@ router.post('/publishers/:orgId/shows/:showId/sync', async (req, res) => {
 
   const hosting = getHostingAdapter();
   const pod = await hosting.getPodcast(show.megaphoneShowId);
+  console.log('Megaphone getPodcast raw:', JSON.stringify(pod));
 
   const data = {};
   if (pod.title)    data.name = pod.title;
@@ -218,7 +219,7 @@ router.post('/publishers/:orgId/shows/:showId/sync', async (req, res) => {
   if (pod.imageUrl) data.coverArtUrl = pod.imageUrl;
 
   const updated = await prisma.show.update({ where: { id: showId }, data });
-  res.json({ show: updated });
+  res.json({ show: updated, _debug: pod });
 });
 
 // DELETE /admin/publishers/:orgId — delete an org and everything under it
