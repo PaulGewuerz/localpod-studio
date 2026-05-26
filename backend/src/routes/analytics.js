@@ -44,20 +44,38 @@ router.get('/', async (req, res) => {
 
     const totalDownloads = normalized.reduce((sum, ep) => sum + ep.downloads, 0);
 
-    // Fetch podcast-level stats (30-day window)
-    const to = new Date().toISOString().slice(0, 10);
-    const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Fetch podcast-level stats (all-time, no date filter)
     let stats = null;
     try {
-      stats = await adapter.getPodcastStats(show.megaphoneShowId, { from, to });
-    } catch {
-      // Stats endpoint optional — don't fail the whole request
+      stats = await adapter.getPodcastStats(show.megaphoneShowId);
+      console.log('Megaphone stats sample:', JSON.stringify(stats).slice(0, 1000));
+    } catch (e) {
+      console.warn('Stats fetch failed:', e.message);
     }
+
+    // Use stats data for downloads if available — episodes endpoint has no download counts
+    const statsEpisodeMap = {};
+    const statsEpisodes = stats?.episodes ?? stats?.data ?? [];
+    if (Array.isArray(statsEpisodes)) {
+      for (const s of statsEpisodes) {
+        if (s.id) statsEpisodeMap[s.id] = s.downloads ?? s.total ?? 0;
+      }
+    }
+
+    const enriched = normalized.map(ep => ({
+      ...ep,
+      downloads: statsEpisodeMap[ep.megaphoneId] ?? ep.downloads,
+    }));
+
+    const totalDownloads2 = enriched.reduce((sum, ep) => sum + ep.downloads, 0)
+      || stats?.downloads
+      || stats?.total
+      || totalDownloads;
 
     res.json({
       available: true,
-      totalDownloads,
-      episodes: normalized.sort((a, b) => b.downloads - a.downloads),
+      totalDownloads: totalDownloads2,
+      episodes: enriched.sort((a, b) => b.downloads - a.downloads),
       stats,
     });
   } catch (err) {
