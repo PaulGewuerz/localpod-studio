@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { sendAnalyticsReportRequest } = require('../email');
 
 // GET /analytics — fetch Megaphone episode download data for a show
 router.get('/', async (req, res) => {
@@ -80,6 +81,33 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ available: false, reason: err.message });
+  }
+});
+
+// POST /analytics/request-report — send analytics report request email to admin
+router.post('/request-report', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { showId } = req.body;
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    include: {
+      shows: showId ? { where: { id: showId } } : { orderBy: { createdAt: 'asc' }, take: 1 },
+    },
+  });
+
+  const show = org?.shows?.[0];
+
+  try {
+    await sendAnalyticsReportRequest({
+      orgName: org.name,
+      showName: show?.name ?? 'Unknown show',
+      userEmail: req.user.email,
+    });
+    res.json({ sent: true });
+  } catch (err) {
+    console.error('Analytics report request email failed:', err.message);
+    res.status(500).json({ error: 'Failed to send request' });
   }
 });
 

@@ -32,4 +32,22 @@ async function sendWelcomeEmail({ to, showName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail };
+async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
+  await resend.emails.send({
+    from: FROM,
+    to: adminEmail,
+    subject: `Analytics report requested — ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:18px;font-weight:600;margin-bottom:8px">Analytics report request</h1>
+        <p style="color:#555;margin-bottom:8px"><strong>Org:</strong> ${orgName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Show:</strong> ${showName}</p>
+        <p style="color:#555;margin-bottom:24px"><strong>Requested by:</strong> ${userEmail}</p>
+        <p style="color:#999;font-size:12px;margin-top:40px">LocalPod Studio</p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest };
