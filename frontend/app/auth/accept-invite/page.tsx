@@ -10,15 +10,25 @@ function AcceptInviteInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const tokenHash = searchParams.get('token_hash')
-  const type = searchParams.get('type') as 'invite' | null
+  // Check query params first, then hash fragment
+  let tokenHash = searchParams.get('token_hash')
+  let type = searchParams.get('type')
+
+  if (!tokenHash && typeof window !== 'undefined' && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    tokenHash = tokenHash || hashParams.get('token_hash')
+    type = type || hashParams.get('type')
+  }
 
   if (!tokenHash || type !== 'invite') {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-full max-w-sm text-center">
           <p className="text-red-600 mb-4">Invalid invite link.</p>
-          <a href="/login" className="text-sm text-black font-medium hover:underline">Back to login</a>
+          <p className="text-xs text-gray-400 mt-2 font-mono break-all">
+            {typeof window !== 'undefined' ? window.location.search + window.location.hash : ''}
+          </p>
+          <a href="/login" className="text-sm text-black font-medium hover:underline mt-4 block">Back to login</a>
         </div>
       </main>
     )
