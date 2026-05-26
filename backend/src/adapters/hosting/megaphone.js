@@ -70,6 +70,21 @@ class MegaphoneAdapter {
   }
 
   /**
+   * Fetch podcast metadata from Megaphone.
+   * @param {string} podcastId
+   * @returns {{ title, summary, feedUrl, imageUrl }}
+   */
+  async getPodcast(podcastId) {
+    const data = await this.#request('GET', this.#podcastPath(podcastId));
+    return {
+      title: data.title || null,
+      summary: data.summary || null,
+      feedUrl: data.feedUrl || data.rssUrl || data.rss_url || null,
+      imageUrl: data.imageFile || data.backgroundImageUrl || null,
+    };
+  }
+
+  /**
    * Update podcast metadata (title, image, etc).
    * @param {string} podcastId
    * @param {object} updates

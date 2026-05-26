@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { supabase, supabaseAdmin } = require('../supabase');
+const { getHostingAdapter } = require('../adapters/hosting');
 // GET /admin/publishers — list all orgs with episode stats
 router.get('/publishers', async (req, res) => {
   const orgs = await prisma.organization.findMany({
@@ -197,6 +198,27 @@ router.post('/publishers/:orgId/users', async (req, res) => {
     .catch(err => console.error('Invite error:', err.message));
 
   res.status(201).json({ user });
+});
+
+// POST /admin/publishers/:orgId/shows/:showId/sync — pull metadata from Megaphone into DB
+router.post('/publishers/:orgId/shows/:showId/sync', async (req, res) => {
+  const { orgId, showId } = req.params;
+
+  const show = await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } });
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+  if (!show.megaphoneShowId) return res.status(400).json({ error: 'No Megaphone show ID set' });
+
+  const hosting = getHostingAdapter();
+  const pod = await hosting.getPodcast(show.megaphoneShowId);
+
+  const data = {};
+  if (pod.title)    data.name = pod.title;
+  if (pod.summary)  data.description = pod.summary;
+  if (pod.feedUrl)  data.megaphoneRssUrl = pod.feedUrl;
+  if (pod.imageUrl) data.coverArtUrl = pod.imageUrl;
+
+  const updated = await prisma.show.update({ where: { id: showId }, data });
+  res.json({ show: updated });
 });
 
 // DELETE /admin/publishers/:orgId — delete an org and everything under it

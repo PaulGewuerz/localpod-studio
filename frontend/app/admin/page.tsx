@@ -75,6 +75,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [activating, setActivating] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState<string | null>(null)
 
 
   useEffect(() => {
@@ -222,6 +223,24 @@ export default function AdminPage() {
       alert(err instanceof Error ? err.message : 'Delete failed')
     } finally {
       setSaving(null)
+    }
+  }
+
+  async function handleSyncMegaphone(orgId: string, showId: string) {
+    setSyncing(showId)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}/shows/${showId}/sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setSyncing(null)
     }
   }
 
@@ -480,7 +499,12 @@ export default function AdminPage() {
                                 {copied === show.id ? 'Copied!' : 'RSS'}
                               </button>
                             )}
-                            {!edShow && (
+                            {show.megaphoneShowId && (
+                              <button onClick={() => handleSyncMegaphone(pub.id, show.id)} disabled={syncing === show.id} className="text-xs text-green-600 hover:underline disabled:opacity-50">
+                                {syncing === show.id ? '…' : 'Sync'}
+                              </button>
+                            )}
+                          {!edShow && (
                               <button onClick={() => startEditShow(show)} className="text-xs text-blue-600 hover:underline">Edit</button>
                             )}
                           </div>
