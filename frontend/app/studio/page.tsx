@@ -496,7 +496,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     const activeShow = me?.shows.find(s => s.id === activeShowId) ?? me?.shows[0] ?? null
     if (activeNav === 'settings' && activeShow) {
       setSettingsName(activeShow.name ?? '')
-      setSettingsDescription(activeShow.description ?? '')
+      const raw = activeShow.description ?? ''
+      const stripped = raw.includes('<') ? new DOMParser().parseFromString(raw, 'text/html').body.innerText : raw
+      setSettingsDescription(stripped)
       setSettingsCoverPreview(activeShow.coverArtUrl ?? null)
       setSettingsCoverFile(null)
       setSettingsError(null)
