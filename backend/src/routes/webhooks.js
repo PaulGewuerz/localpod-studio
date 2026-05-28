@@ -30,12 +30,14 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             include: { organization: { include: { subscription: true } } },
           });
           if (user?.organization?.subscription) {
+            const plan = obj.metadata?.plan ?? 'publisher';
             await prisma.subscription.update({
               where: { organizationId: user.organization.id },
               data: {
                 stripeCustomerId: obj.customer,
                 stripeSubscriptionId: obj.subscription,
                 status: 'active',
+                plan,
               },
             });
 
