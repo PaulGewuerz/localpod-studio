@@ -44,7 +44,7 @@ interface ShowData {
 interface MeData {
   org: { id: string; name: string; defaultVoice: Voice | null }
   shows: ShowData[]
-  subscription: { stripeCustomerId: string | null; status: string } | null
+  subscription: { stripeCustomerId: string | null; status: string; plan: string | null } | null
 }
 
 type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings' | 'ads'
@@ -798,7 +798,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   const monthlyPublishedCount = episodes.filter(e =>
     e.status === 'published' && new Date(e.createdAt) >= startOfMonth
   ).length
-  const CHARACTER_LIMIT = 150_000
+  const isSolo = me?.subscription?.plan === 'solo'
+  const CHARACTER_LIMIT = isSolo ? 50_000 : 150_000
   const monthlyCharCount = episodes
     .filter(e => new Date(e.createdAt) >= startOfMonth && e.characterCount != null)
     .reduce((sum, e) => sum + (e.characterCount ?? 0), 0)
@@ -878,7 +879,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           </div>
           <NavItem navKey="shows"     icon="◈" label="Shows" />
           <NavItem navKey="analytics" icon="◌" label="Analytics" />
-          <NavItem navKey="ads"       icon="◧" label="Ad Manager" />
+          {!isSolo && <NavItem navKey="ads" icon="◧" label="Ad Manager" />}
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Settings
@@ -1275,8 +1276,17 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             <div className="max-w-lg">
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Current Plan</div>
-                <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Studio — $99/mo</div>
-                <div className="text-[13px] text-[var(--ink-light)]">Unlimited episodes · RSS distribution · Priority support</div>
+                {isSolo ? (
+                  <>
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">Unlimited episodes · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
+                  </>
+                )}
               </div>
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                 <div className="text-[13px] text-[var(--ink-light)] mb-5">

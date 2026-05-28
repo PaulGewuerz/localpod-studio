@@ -176,6 +176,8 @@ export default function OnboardingPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
 
+  const [selectedPlan, setSelectedPlan] = useState<'solo' | 'publisher'>('publisher')
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -272,7 +274,7 @@ export default function OnboardingPage() {
       const res = await fetch(`${API_URL}/billing/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: session!.user.email }),
+        body: JSON.stringify({ email: session!.user.email, plan: selectedPlan, interval: billingInterval }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create checkout session')
@@ -420,32 +422,68 @@ export default function OnboardingPage() {
           {/* Step 3: Subscribe */}
           {step === 2 && (
             <>
-              <h1 className="text-xl font-semibold text-gray-900 mb-1">Start your subscription</h1>
-              <p className="text-sm text-gray-500 mb-6">You're all set. Activate your account to start publishing.</p>
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Show</span>
-                  <span className="font-medium text-gray-900">{showName}</span>
-                </div>
-                {author && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Publisher</span>
-                    <span className="font-medium text-gray-900">{author}</span>
-                  </div>
-                )}
-                {categories.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Categories</span>
-                    <span className="font-medium text-gray-900 text-right">{categories.join(', ')}</span>
-                  </div>
-                )}
-                {coverFile && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Cover art</span>
-                    <span className="font-medium text-gray-900">Uploaded</span>
-                  </div>
-                )}
+              <h1 className="text-xl font-semibold text-gray-900 mb-1">Choose a plan</h1>
+              <p className="text-sm text-gray-500 mb-5">Start publishing today. Cancel anytime.</p>
+
+              {/* Billing interval toggle */}
+              <div className="flex items-center gap-2 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('monthly')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${billingInterval === 'monthly' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('annual')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${billingInterval === 'annual' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                >
+                  Annual <span className="text-xs font-normal opacity-75">save ~20%</span>
+                </button>
               </div>
+
+              {/* Plan cards */}
+              <div className="space-y-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan('solo')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${selectedPlan === 'solo' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-gray-900">Solo</span>
+                    <span className="font-semibold text-gray-900">
+                      {billingInterval === 'annual' ? '$39/mo' : '$49/mo'}
+                      {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
+                    </span>
+                  </div>
+                  <ul className="text-xs text-gray-500 space-y-0.5">
+                    <li>1 podcast feed</li>
+                    <li>50,000 AI characters / month</li>
+                    <li>RSS distribution</li>
+                  </ul>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan('publisher')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${selectedPlan === 'publisher' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-gray-900">Publisher</span>
+                    <span className="font-semibold text-gray-900">
+                      {billingInterval === 'annual' ? '$79/mo' : '$99/mo'}
+                      {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
+                    </span>
+                  </div>
+                  <ul className="text-xs text-gray-500 space-y-0.5">
+                    <li>Unlimited podcast feeds</li>
+                    <li>150,000 AI characters / month</li>
+                    <li>RSS distribution · Ad Manager · Priority support</li>
+                  </ul>
+                </button>
+              </div>
+
               {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
               <button
                 onClick={handleSubscribe}
