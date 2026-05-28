@@ -423,6 +423,10 @@ function StudioInner() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalError, setPortalError] = useState<string | null>(null)
 
+  // Distribution
+  const [distSubmitLoading, setDistSubmitLoading] = useState(false)
+  const [distSubmitDone, setDistSubmitDone] = useState(false)
+
   // Settings
   const [settingsName, setSettingsName] = useState('')
   const [settingsDescription, setSettingsDescription] = useState('')
@@ -1375,8 +1379,72 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           {/* ── DISTRIBUTION ──────────────────────────────────────────── */}
           {activeNav === 'dist' && (() => {
             const activeShow = me.shows.find(s => s.id === activeShowId) ?? me.shows[0] ?? null
+
+            const directories = [
+              { name: 'Apple Podcasts', url: 'https://podcastsconnect.apple.com/my-podcasts/new-feed' },
+              { name: 'Spotify', url: 'https://podcasters.spotify.com' },
+              { name: 'Amazon Music', url: 'https://podcasters.amazon.com' },
+              { name: 'iHeartRadio', url: 'https://podcasters.iheart.com' },
+              { name: 'Pocket Casts', url: 'https://pocketcasts.com/submit' },
+              { name: 'TuneIn', url: 'https://tunein.com/get-listed/' },
+            ]
+
+            async function handleDistSubmit() {
+              setDistSubmitLoading(true)
+              try {
+                const token = await getToken()
+                await fetch(`${API_URL}/distribution/submit-request`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ showId: activeShow?.id }),
+                })
+                setDistSubmitDone(true)
+              } finally {
+                setDistSubmitLoading(false)
+              }
+            }
+
             return (
             <div className="max-w-xl space-y-6">
+
+              {/* Directory submission links */}
+              <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Submit to Directories</div>
+                <p className="text-[13px] text-[var(--ink-light)] mb-5">Submit your RSS feed to each platform to get listed. You'll need your RSS feed URL from the embed section below.</p>
+                <div className="divide-y divide-[var(--rule)]">
+                  {directories.map(({ name, url }) => (
+                    <div key={name} className="flex items-center justify-between py-3">
+                      <span className="text-[13px] font-medium text-[var(--ink)]">{name}</span>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--blue)] hover:underline"
+                      >
+                        Submit →
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Have LocalPod do it */}
+              <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Prefer We Handle It?</div>
+                <p className="text-[13px] text-[var(--ink-light)] mb-4">We'll submit your podcast to all major directories on your behalf. Approvals typically take 2–5 business days — we'll email you once everything is live.</p>
+                {distSubmitDone ? (
+                  <p className="text-[13px] font-semibold text-[var(--ink)]">Request sent — we'll be in touch.</p>
+                ) : (
+                  <button
+                    onClick={handleDistSubmit}
+                    disabled={distSubmitLoading}
+                    className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                  >
+                    {distSubmitLoading ? 'Sending…' : 'Have LocalPod Submit for Me →'}
+                  </button>
+                )}
+              </div>
+
               {/* Embed player */}
               {activeShow?.megaphoneRssUrl && (() => {
                 const externalId = activeShow.megaphoneRssUrl!.split('/').pop()

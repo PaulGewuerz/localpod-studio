@@ -50,4 +50,28 @@ async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest };
+async function sendDistributionRequestConfirmation({ to, showName }) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `We're handling your directory submissions for ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:22px;font-weight:600;margin-bottom:8px">We're on it.</h1>
+        <p style="color:#555;margin-bottom:16px">
+          We've received your request to submit <strong>${showName}</strong> to Apple Podcasts,
+          Spotify, Amazon Music, and other major directories.
+        </p>
+        <p style="color:#555;margin-bottom:24px">
+          Approvals are usually quick but can take up to 5 business days depending on the platform.
+          We'll email you once everything is live.
+        </p>
+        <p style="color:#999;font-size:12px;margin-top:40px">
+          LocalPod Studio · If you have questions, reply to this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation };

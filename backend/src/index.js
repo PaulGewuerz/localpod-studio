@@ -38,6 +38,7 @@ app.use('/billing', require('./routes/billing'));
 app.use('/admin', require('./middleware/requireAdmin'), require('./routes/admin'));
 app.use('/pronunciation', require('./routes/pronunciation'));
 app.use('/support', require('./routes/support'));
+app.use('/distribution', requireActiveSubscription, require('./routes/distribution'));
 
 if (process.env.NODE_ENV !== 'production') {
   app.use('/dev-login', require('./routes/devLogin'));
