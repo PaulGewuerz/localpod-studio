@@ -141,12 +141,53 @@
       margin-bottom: 72px;
     }
 
+    /* ── BILLING TOGGLE ── */
+    .billing-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--navy-border);
+      border-radius: 8px;
+      padding: 4px;
+      margin-bottom: 48px;
+    }
+
+    .toggle-btn {
+      padding: 8px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .toggle-btn.active {
+      background: var(--teal);
+      color: var(--navy);
+      font-weight: 700;
+    }
+
+    .toggle-btn .save-tag {
+      display: inline-block;
+      background: rgba(11,15,26,0.25);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 6px;
+      margin-left: 6px;
+    }
+
     /* ── PRICING GRID ── */
     .pricing-grid {
       width: 100%;
-      max-width: 520px;
+      max-width: 880px;
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 24px;
       align-items: start;
     }
@@ -362,6 +403,7 @@
       nav { padding: 16px 24px; }
       .nav-links { display: none; }
       .page-content { padding: 120px 24px 80px; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
       .pricing-card { padding: 32px 24px; }
       footer { padding: 24px; flex-direction: column; gap: 10px; text-align: center; }
     }
@@ -388,33 +430,89 @@
   <h1 class="page-headline">Simple, transparent pricing.</h1>
   <p class="page-sub">Everything you need to turn your newsroom into a podcast network — no hidden fees, no per-episode charges.</p>
 
+  <!-- Billing toggle -->
+  <div class="billing-toggle">
+    <button class="toggle-btn active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</button>
+    <button class="toggle-btn" id="btn-annual" onclick="setBilling('annual')">Annual <span class="save-tag">Save ~20%</span></button>
+  </div>
+
   <div class="pricing-grid">
+
+    <!-- SOLO -->
+    <div class="pricing-card">
+      <div class="card-header">
+        <div class="plan-badge">Solo</div>
+      </div>
+      <div class="plan-name">LocalPod Solo</div>
+      <div class="plan-price">
+        <span class="price-amount" id="solo-price">$49</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <p class="plan-desc" id="solo-billing-note">&nbsp;</p>
+
+      <div class="features-label">What's included</div>
+      <ul class="features-list">
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          1 podcast feed
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          50,000 AI-narrated characters per month
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Unlimited audio uploads
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Distribution to Apple Podcasts, Spotify, and all major apps
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Professional AI narration voices
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Episode scheduling and draft management
+        </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Download analytics and listener stats
+        </li>
+      </ul>
+
+      <a href="https://app.localpod.co" class="btn-secondary">
+        Get Started
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    </div>
 
     <!-- PUBLISHER -->
     <div class="pricing-card popular">
       <div class="card-header">
         <div class="plan-badge">Publisher</div>
       </div>
-      <div class="plan-name">LocalPod Studio</div>
+      <div class="plan-name">LocalPod Publisher</div>
       <div class="plan-price">
-        <span class="price-amount">$99</span>
+        <span class="price-amount" id="pub-price">$99</span>
         <span class="price-period">/ month</span>
       </div>
-      <p class="plan-desc">Everything a local newsroom needs to launch and grow a podcast — with no technical overhead.</p>
+      <p class="plan-desc" id="pub-billing-note">&nbsp;</p>
 
       <div class="features-label">What's included</div>
       <ul class="features-list">
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Unlimited podcast feeds
+        </li>
         <li>
           <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
           150,000 AI-narrated characters per month
         </li>
         <li>
           <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Unlimited episodes per month
-        </li>
-        <li>
-          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
-          Standard audio uploads (interviews, recordings)
+          Unlimited audio uploads
         </li>
         <li>
           <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
@@ -436,6 +534,10 @@
           <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
           Download analytics and listener stats
         </li>
+        <li>
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></span>
+          Priority support
+        </li>
       </ul>
 
       <a href="https://app.localpod.co" class="btn-primary">
@@ -444,11 +546,11 @@
       </a>
     </div>
 
-    <p class="enterprise-note">
-      Need more? <a href="mailto:paul@localpod.co">Contact us</a> about enterprise pricing.
-    </p>
-
   </div>
+
+  <p class="enterprise-note" style="margin-top:32px;">
+    Need more? <a href="mailto:paul@localpod.co">Contact us</a> about enterprise pricing.
+  </p>
 </main>
 
 <!-- FOOTER -->
@@ -457,5 +559,16 @@
   <a href="mailto:paul@localpod.co">paul@localpod.co</a>
 </footer>
 
+<script>
+  function setBilling(interval) {
+    const isAnnual = interval === 'annual';
+    document.getElementById('btn-monthly').classList.toggle('active', !isAnnual);
+    document.getElementById('btn-annual').classList.toggle('active', isAnnual);
+    document.getElementById('solo-price').textContent = isAnnual ? '$39' : '$49';
+    document.getElementById('pub-price').textContent = isAnnual ? '$82' : '$99';
+    document.getElementById('solo-billing-note').textContent = isAnnual ? 'Billed $468 / year' : '\u00a0';
+    document.getElementById('pub-billing-note').textContent = isAnnual ? 'Billed $984 / year' : '\u00a0';
+  }
+</script>
 </body>
 </html>
