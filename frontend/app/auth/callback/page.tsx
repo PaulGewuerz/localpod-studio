@@ -9,8 +9,8 @@ const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const [logs, setLogs] = useState<string[]>(['Starting…'])
-  const log = (msg: string) => setLogs(prev => [...prev, msg])
+  const [logs, setLogs] = useState<string[]>([])
+  const log = (msg: string) => console.log('[auth/callback]', msg)
 
   useEffect(() => {
     async function handleSession(session: import('@supabase/supabase-js').Session) {
@@ -88,8 +88,7 @@ export default function AuthCallbackPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <p className="text-gray-500 mb-2">Signing you in…</p>
-        {logs.map((l, i) => <p key={i} className="text-xs text-gray-400 font-mono">{l}</p>)}
+        <p className="text-gray-500">Signing you in…</p>
       </div>
     </main>
   )
