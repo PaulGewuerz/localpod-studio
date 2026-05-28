@@ -135,9 +135,17 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           : obj.status === 'past_due' ? 'payment_failed'
           : obj.status === 'canceled' ? 'inactive'
           : obj.status;
+
+        const priceId = obj.items?.data?.[0]?.price?.id;
+        const soloPrices = [process.env.STRIPE_SOLO_MONTHLY_PRICE_ID, process.env.STRIPE_SOLO_ANNUAL_PRICE_ID];
+        const publisherPrices = [process.env.STRIPE_PUBLISHER_MONTHLY_PRICE_ID, process.env.STRIPE_PUBLISHER_ANNUAL_PRICE_ID];
+        const plan = soloPrices.includes(priceId) ? 'solo'
+          : publisherPrices.includes(priceId) ? 'publisher'
+          : undefined;
+
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: obj.id },
-          data: { status },
+          data: { status, ...(plan ? { plan } : {}) },
         });
         break;
       }
