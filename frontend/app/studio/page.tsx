@@ -1181,7 +1181,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                           const link = (e.target as HTMLElement).closest('a')
                           if (link) { e.preventDefault(); window.open(link.getAttribute('href') ?? '', '_blank', 'noreferrer') }
                         }}
-                        className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] min-h-[80px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
+                        className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] min-h-[160px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
                         data-placeholder="Optional — appears in the episode description on Spotify, Apple Podcasts, etc."
                       />
                     </div>
