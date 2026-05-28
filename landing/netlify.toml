@@ -1,2 +1,7 @@
 [build]
   publish = "."
+
+[[redirects]]
+  from = "/mortgage"
+  to = "/localpod_mortgage_lo.html"
+  status = 200

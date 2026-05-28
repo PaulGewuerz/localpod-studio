@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalPod Studio — For Mortgage Loan Officers &amp; Brokers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #0C0F1A; --bg: #F5F7FA; --warm: #EDF0F5;
+    --accent: #1D4ED8; --accent-dark: #1539B0; --accent-light: rgba(29,78,216,0.08);
+    --muted: #6B7280; --border: #DDE2EC;
+    --navy: #0b0f1a; --teal: #2dd4bf;
+    --sans: 'DM Sans', sans-serif;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--ink); line-height: 1.6; overflow-x: hidden; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 16px 40px; background: rgba(11,15,26,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .nav-logo img { height: 32px; width: auto; }
+  .nav-logo { font-family: "Montserrat", sans-serif; font-size: 20px; color: white; text-decoration: none; letter-spacing: -0.2px; }
+  .nav-logo span { font-weight: 700; }
+  .footer-logo { font-family: "Montserrat", sans-serif; font-size: 18px; color: white; text-decoration: none; letter-spacing: -0.2px; }
+  .footer-logo span { font-weight: 700; }
+  .nav-cta { background: white; color: var(--navy); font-size: 14px; font-weight: 600; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: opacity 0.2s; }
+  .nav-cta:hover { opacity: 0.88; }
+
+  .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 130px 40px 80px; max-width: 1100px; margin: 0 auto; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; }
+  .eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--accent); display: block; }
+  h1 { font-size: clamp(40px, 6vw, 74px); font-weight: 700; line-height: 1.07; letter-spacing: -1.5px; color: var(--ink); max-width: 880px; margin-bottom: 32px; }
+  h1 em { font-style: italic; color: var(--accent); font-weight: 300; }
+  .hero-sub { font-size: 18px; font-weight: 300; color: var(--muted); max-width: 580px; line-height: 1.75; margin-bottom: 44px; }
+  .hero-actions { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-bottom: 64px; }
+  .btn-primary { background: var(--accent); color: white; font-size: 15px; font-weight: 500; padding: 15px 32px; border-radius: 8px; text-decoration: none; transition: background 0.2s, transform 0.15s; display: inline-block; }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); }
+  .hero-note { font-size: 13px; color: var(--muted); }
+  .trust-row { display: flex; gap: 32px; flex-wrap: wrap; padding-top: 40px; border-top: 1px solid var(--border); }
+  .trust-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .trust-item svg { color: var(--accent); flex-shrink: 0; }
+
+  .strip { background: var(--navy); padding: 0 40px; display: flex; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+  .strip-item { padding: 20px 28px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.55); border-right: 1px solid rgba(255,255,255,0.08); }
+  .strip-item:last-child { border-right: none; }
+  .strip-item strong { color: white; font-weight: 600; }
+
+  section { padding: 96px 40px; }
+  .inner { max-width: 1100px; margin: 0 auto; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  h2 { font-size: clamp(28px, 4vw, 50px); font-weight: 700; line-height: 1.1; letter-spacing: -0.5px; color: var(--ink); max-width: 700px; margin-bottom: 20px; }
+  h2 em { font-style: italic; color: var(--accent); font-weight: 300; font-size: 0.95em; }
+  .body-copy { font-size: 17px; font-weight: 300; color: var(--muted); max-width: 560px; line-height: 1.75; margin-bottom: 56px; }
+
+  .dark { background: var(--navy); }
+  .dark h2 { color: white; max-width: 820px; }
+  .dark .label { color: var(--teal); }
+  .dark .body-copy { color: rgba(255,255,255,0.5); }
+
+  .fear-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; margin-bottom: 48px; }
+  .fc { background: rgba(255,255,255,0.03); padding: 36px 28px; transition: background 0.2s; }
+  .fc:hover { background: rgba(255,255,255,0.07); }
+  .fc-num { font-size: 44px; font-weight: 700; color: rgba(45,212,191,0.2); line-height: 1; margin-bottom: 16px; }
+  .fc-title { font-size: 15px; font-weight: 600; color: white; margin-bottom: 10px; }
+  .fc-body { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.45); line-height: 1.65; }
+
+  .quote-block { border-left: 3px solid var(--teal); padding: 24px 28px; background: rgba(45,212,191,0.06); border-radius: 0 8px 8px 0; margin-top: 40px; }
+  .quote-block p { font-size: 19px; font-weight: 300; font-style: italic; color: white; line-height: 1.55; margin-bottom: 12px; }
+  .quote-attr { font-size: 13px; color: rgba(255,255,255,0.4); }
+
+  .content-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 48px; }
+  .ct { background: var(--warm); border: 1px solid var(--border); border-radius: 10px; padding: 24px; transition: border-color 0.2s, box-shadow 0.2s; }
+  .ct:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(29,78,216,0.08); }
+  .ct-tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); padding: 2px 8px; border-radius: 4px; margin-bottom: 10px; }
+  .ct-icon { font-size: 22px; margin-bottom: 12px; }
+  .ct-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .ct-body { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.6; }
+
+  .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 40px; margin-top: 56px; }
+  .step { border-left: 2px solid var(--border); padding-left: 20px; transition: border-color 0.2s; }
+  .step:hover { border-color: var(--accent); }
+  .step-num { font-size: 13px; font-style: italic; color: var(--accent); margin-bottom: 12px; font-weight: 300; }
+  .step-title { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .step-body { font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.65; }
+
+  .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 56px; }
+  @media (max-width: 680px) { .context-grid { grid-template-columns: 1fr; } }
+  .context-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 36px 32px; transition: box-shadow 0.2s, transform 0.2s; }
+  .context-card:hover { box-shadow: 0 8px 32px rgba(12,15,26,0.07); transform: translateY(-2px); }
+  .cc-tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); padding: 4px 10px; border-radius: 4px; margin-bottom: 20px; }
+  .cc-title { font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 14px; line-height: 1.25; }
+  .cc-body { font-size: 14px; font-weight: 300; color: var(--muted); line-height: 1.72; }
+
+  .price-block { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 48px; margin-top: 56px; display: flex; gap: 56px; flex-wrap: wrap; align-items: flex-start; }
+  .price-left { flex: 1; min-width: 200px; }
+  .price-num { font-size: 72px; font-weight: 700; color: var(--ink); line-height: 1; }
+  .price-period { font-size: 14px; font-weight: 300; color: var(--muted); margin-top: 6px; margin-bottom: 6px; }
+  .price-no-contract { font-size: 13px; font-weight: 500; color: var(--accent); margin-bottom: 32px; }
+  .includes { flex: 2; min-width: 280px; }
+  .includes-title { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+  .include-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .include-item:last-child { border-bottom: none; }
+  .include-check { width: 22px; height: 22px; background: var(--accent-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .include-check svg { color: var(--accent); }
+  .include-name { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 3px; }
+  .include-desc { font-size: 13px; font-weight: 300; color: var(--muted); line-height: 1.55; }
+
+  .cta-section { background: var(--navy); text-align: center; }
+  .cta-title { font-size: clamp(30px, 5vw, 54px); font-weight: 700; color: white; letter-spacing: -0.5px; line-height: 1.1; margin-bottom: 20px; }
+  .cta-title em { font-style: italic; color: var(--teal); font-weight: 300; }
+  .cta-body { font-size: 17px; font-weight: 300; color: rgba(255,255,255,0.6); margin-bottom: 40px; line-height: 1.7; max-width: 520px; margin-left: auto; margin-right: auto; }
+  .btn-teal { background: var(--teal); color: var(--navy); font-size: 15px; font-weight: 700; padding: 15px 36px; border-radius: 8px; text-decoration: none; display: inline-block; transition: transform 0.15s, opacity 0.2s; }
+  .btn-teal:hover { transform: translateY(-2px); opacity: 0.9; }
+
+  footer { background: var(--navy); border-top: 1px solid rgba(255,255,255,0.08); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  
+  footer p { font-size: 13px; color: rgba(255,255,255,0.3); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .eyebrow { animation: fadeUp 0.5s 0.0s ease both; }
+  h1 { animation: fadeUp 0.5s 0.1s ease both; }
+  .hero-sub { animation: fadeUp 0.5s 0.2s ease both; }
+  .hero-actions { animation: fadeUp 0.5s 0.3s ease both; }
+  .trust-row { animation: fadeUp 0.5s 0.4s ease both; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://localpod.co" class="nav-logo"><span>LocalPod</span> Studio</a>
+  <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="nav-cta">Book a free demo</a>
+</nav>
+
+<div class="hero">
+  <div class="eyebrow">For independent mortgage loan officers &amp; brokers</div>
+  <h1>Every week you're silent,<br>someone else is in your<br><em>agents' ears.</em></h1>
+  <p class="hero-sub">You're already writing the market update. LocalPod Studio turns it into a podcast your referral partners and past clients can hear on their commute — without you recording a single word.</p>
+  <div class="hero-actions">
+    <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="btn-primary">Book a free 20-min demo</a>
+    <span class="hero-note">No recording. No editing. 5 minutes per episode.</span>
+  </div>
+  <div class="trust-row">
+    <div class="trust-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Publishes to Apple Podcasts &amp; Spotify</div>
+    <div class="trust-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>You approve every episode before it goes live</div>
+    <div class="trust-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>$99/month — no contracts</div>
+    <div class="trust-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Built for brokers who run their own shop</div>
+  </div>
+</div>
+
+<div class="strip">
+  <div class="strip-item"><strong>Out of sight.</strong>&nbsp;Out of mind.</div>
+  <div class="strip-item">The LOs winning right now are the ones <strong>staying visible every week.</strong></div>
+  <div class="strip-item">Your database is your <strong>biggest asset.</strong> Are you working it?</div>
+</div>
+
+<section class="dark">
+  <div class="inner">
+    <div class="label">The problem</div>
+    <h2>Your weekly market update is getting ignored. And another LO is using that silence to poach your agents.</h2>
+    <p class="body-copy">You already know what happens when you go quiet. The agents you've worked hard to build relationships with start sending deals to whoever showed up more consistently. In a purchase market, you can't afford to be out of sight.</p>
+    <div class="fear-cards">
+      <div class="fc"><div class="fc-num">01</div><div class="fc-title">Email open rates are dropping</div><div class="fc-body">Your agent partners are getting flooded with market updates from every LO in their market. Your weekly email is competing for attention in a very crowded inbox.</div></div>
+      <div class="fc"><div class="fc-num">02</div><div class="fc-title">Podcasting takes too long</div><div class="fc-body">Recording, editing, uploading, writing show notes — most LOs who try it abandon the effort within a month. Consistency is the whole game, and it's the hardest part.</div></div>
+      <div class="fc"><div class="fc-num">03</div><div class="fc-title">Your past client database is sitting idle</div><div class="fc-body">The LOs who win refis are the ones whose past clients already hear from them regularly. A podcast that runs on autopilot from your existing content is how you work your database without adding to your week.</div></div>
+    </div>
+    <div class="quote-block">
+      <p>"You feel burnt out and wonder what happened to the times you were so busy. Your current agents are being poached by other originators who showed up while you were quiet."</p>
+      <div class="quote-attr">— Top Originator Underground community thread</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="inner">
+    <div class="label">What gets converted</div>
+    <h2>You're already writing it. We make it listenable.</h2>
+    <p class="body-copy">LocalPod Studio works with the content you're already producing every week — no new writing required. Paste it in, approve the episode, and it's live on Apple Podcasts and Spotify before the day is out.</p>
+    <div class="content-types">
+      <div class="ct"><div class="ct-tag">Agent-facing</div><div class="ct-icon">📈</div><div class="ct-title">Weekly market update</div><div class="ct-body">Rates, MBS movement, upcoming economic data — the email you're already sending your referral partners every Monday becomes a 4-minute episode they can hear between showings.</div></div>
+      <div class="ct"><div class="ct-tag">Database</div><div class="ct-icon">📬</div><div class="ct-title">Monthly newsletter</div><div class="ct-body">Your homeowner tips, rate environment update, and market commentary — the monthly touchpoint to your past client database gets a new audio channel automatically.</div></div>
+      <div class="ct"><div class="ct-tag">Education</div><div class="ct-icon">🏡</div><div class="ct-title">Homebuyer education content</div><div class="ct-body">The "what to expect during the process" emails, the first-time buyer guides — evergreen content that works as a podcast episode and keeps delivering long after you write it once.</div></div>
+      <div class="ct"><div class="ct-tag">Market</div><div class="ct-icon">🎙️</div><div class="ct-title">Rate commentary</div><div class="ct-body">Your weekly rate recap, turned into a short podcast episode under your name — in your agents' podcast apps alongside the shows they already listen to.</div></div>
+    </div>
+  </div>
+</section>
+
+<section style="background: var(--warm);">
+  <div class="inner">
+    <div class="label">How it works</div>
+    <h2>Paste your update. We handle everything else.</h2>
+    <p class="body-copy">The whole workflow takes under 5 minutes. You write the content — same as you always have. LocalPod Studio handles the narration and the distribution.</p>
+    <div class="steps-grid">
+      <div class="step"><div class="step-num">Step one</div><div class="step-title">Paste in your market update or newsletter</div><div class="step-body">Drop in the content you've already written — your weekly rate commentary, monthly newsletter, or homebuyer guide. No reformatting, no prep.</div></div>
+      <div class="step"><div class="step-num">Step two</div><div class="step-title">Choose your AI narrator voice</div><div class="step-body">Select from professional broadcast-quality voices. Your name on the show, your brand on the episode — delivered in a voice your listeners will trust.</div></div>
+      <div class="step"><div class="step-num">Step three</div><div class="step-title">Preview and approve</div><div class="step-body">Listen before it goes anywhere. You control every episode that carries your name. Nothing publishes without your sign-off.</div></div>
+      <div class="step"><div class="step-num">Step four</div><div class="step-title">Live on Apple Podcasts, Spotify, and your site</div><div class="step-body">Full distribution automatically. Embeddable player ready for your website. Your agents and past clients find you wherever they already listen.</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="inner">
+    <div class="label">Why now</div>
+    <h2>The purchase market is tight. The LOs winning are the ones who never went quiet.</h2>
+    <p class="body-copy">Refi volume is gone. The LOs building durable businesses right now are the ones whose referral partners and past clients hear from them consistently — not just when rates drop.</p>
+    <div class="context-grid">
+      <div class="context-card"><div class="cc-tag">Own your database</div><div class="cc-title">Your past client database is your most important asset</div><div class="cc-body">The LOs who win refis when rates eventually drop are the ones whose past clients have been hearing from them all along. A consistent podcast that runs on autopilot from your existing content is how you keep that database warm without adding to your week.</div></div>
+      <div class="context-card"><div class="cc-tag">Purchase market reality</div><div class="cc-title">Your agent relationships are the whole game right now</div><div class="cc-body">In a purchase-dominated market, every deal runs through a referral partner. The LOs who show up in their agents' ears every week — with a professional, consistent, named podcast — are the ones getting the call when a buyer walks in the door. The ones who went quiet are getting poached.</div></div>
+    </div>
+  </div>
+</section>
+
+<section style="background: var(--warm);">
+  <div class="inner">
+    <div class="label">Pricing</div>
+    <h2>One closed referral pays for four years of LocalPod.</h2>
+    <p class="body-copy">Everything you need to run a professional podcast from your existing content. No add-ons, no per-episode fees, no surprises.</p>
+    <div class="price-block">
+      <div class="price-left">
+        <div class="price-num">$99</div>
+        <div class="price-period">per month</div>
+        <div class="price-no-contract">No contracts · Cancel any time</div>
+        <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="btn-primary">Book a free demo</a>
+      </div>
+      <div class="includes">
+        <div class="includes-title">Everything included</div>
+        <div class="include-item"><div class="include-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="include-name">Unlimited episodes — up to 150,000 characters/month</div><div class="include-desc">Enough for a weekly market update and your monthly newsletter every month, with room to spare.</div></div></div>
+        <div class="include-item"><div class="include-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="include-name">Multiple shows per account</div><div class="include-desc">Run a separate show for your agent partners and your past client database — different audiences, different content, one subscription.</div></div></div>
+        <div class="include-item"><div class="include-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="include-name">Full distribution — Apple Podcasts, Spotify, RSS</div><div class="include-desc">Your show goes live everywhere your referral partners and past clients already listen. No manual uploads.</div></div></div>
+        <div class="include-item"><div class="include-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="include-name">Approval workflow — nothing publishes without your sign-off</div><div class="include-desc">Preview every episode before it goes live. Your name is on it — you stay in control.</div></div></div>
+        <div class="include-item"><div class="include-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="include-name">Embeddable player for your website</div><div class="include-desc">Drop a podcast player onto your site with one line of code. Keeps visitors on your page longer.</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="inner" style="max-width: 640px;">
+    <h2 class="cta-title">Stop going quiet.<br><em>Start showing up every week.</em></h2>
+    <p class="cta-body">Book a free 20-minute demo. We'll show you the full workflow and have your first episode ready to publish before the call ends.</p>
+    <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="btn-teal">Book your free demo →</a>
+  </div>
+</section>
+
+<footer>
+  <a href="https://localpod.co" class="nav-logo"><span>LocalPod</span> Studio</a>
+  <p>© 2026 LocalPod Studio. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
