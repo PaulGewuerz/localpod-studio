@@ -1288,6 +1288,35 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   </>
                 )}
               </div>
+              {/* Other plan */}
+              {isSolo ? (
+                <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
+                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
+                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Ad Manager · Priority support</div>
+                  <button
+                    onClick={handlePortal}
+                    disabled={portalLoading}
+                    className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                  >
+                    {portalLoading ? 'Opening…' : 'Upgrade →'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
+                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Downgrade</div>
+                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
+                  <button
+                    onClick={handlePortal}
+                    disabled={portalLoading}
+                    className="px-5 py-2.5 border border-[var(--rule)] text-[var(--ink)] text-[13px] font-semibold rounded-[6px] hover:border-[var(--ink)] disabled:opacity-50 transition-colors"
+                  >
+                    {portalLoading ? 'Opening…' : 'Downgrade →'}
+                  </button>
+                </div>
+              )}
+
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                 <div className="text-[13px] text-[var(--ink-light)] mb-5">
                   Manage your payment method, download invoices, or cancel your subscription through the Stripe billing portal.
