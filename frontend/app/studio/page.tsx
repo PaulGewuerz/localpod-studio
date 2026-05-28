@@ -1284,7 +1284,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 ) : (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                    <div className="text-[13px] text-[var(--ink-light)]">Unlimited episodes · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
                   </>
                 )}
               </div>
