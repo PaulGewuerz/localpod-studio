@@ -38,7 +38,7 @@ export default function AuthCallbackPage() {
       const tokenHash = params.get('token_hash')
       const type = params.get('type')
       const hash = window.location.hash
-      setDebugInfo(`code=${!!code} token_hash=${!!tokenHash} type=${type} hash=${!!hash}`)
+      setDebugInfo(`code=${code?.slice(0,8) ?? 'null'} token_hash=${!!tokenHash} type=${type} hash="${hash.slice(0,40)}" search="${window.location.search.slice(0,80)}"`)
 
       // Invite link — exchange token then send to set-password page
       if (tokenHash && type === 'invite') {
