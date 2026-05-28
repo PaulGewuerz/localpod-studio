@@ -472,7 +472,7 @@ export default function OnboardingPage() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-gray-900">Publisher</span>
                     <span className="font-semibold text-gray-900">
-                      {billingInterval === 'annual' ? '$79/mo' : '$99/mo'}
+                      {billingInterval === 'annual' ? '$82/mo' : '$99/mo'}
                       {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
                     </span>
                   </div>
