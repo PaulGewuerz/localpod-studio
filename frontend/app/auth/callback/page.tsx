@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -14,10 +13,6 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     async function handleSession(session: import('@supabase/supabase-js').Session) {
-      if (ADMIN_EMAIL && session.user.email === ADMIN_EMAIL) {
-        router.replace('/admin')
-        return
-      }
       log('Session found, checking /me…')
       try {
         const res = await fetch(`${API_URL}/me`, {
