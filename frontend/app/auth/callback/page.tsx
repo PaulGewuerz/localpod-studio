@@ -9,7 +9,8 @@ const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL
 
 export default function AuthCallbackPage() {
   const router = useRouter()
-  const [debugInfo, setDebugInfo] = useState<string>('Starting…')
+  const [logs, setLogs] = useState<string[]>(['Starting…'])
+  const log = (msg: string) => setLogs(prev => [...prev, msg])
 
   useEffect(() => {
     async function handleSession(session: import('@supabase/supabase-js').Session) {
@@ -17,17 +18,17 @@ export default function AuthCallbackPage() {
         router.replace('/admin')
         return
       }
-      setDebugInfo('Session found, checking /me…')
+      log('Session found, checking /me…')
       try {
         const res = await fetch(`${API_URL}/me`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
-        if (!res.ok) { setDebugInfo('/me returned ' + res.status + ', going to onboarding'); router.replace('/onboarding'); return }
+        if (!res.ok) { log('/me returned ' + res.status + ', going to onboarding'); router.replace('/onboarding'); return }
         const { subscription } = await res.json()
         const activeStatuses = ['active', 'trial']
-        if (!subscription?.status || !activeStatuses.includes(subscription.status)) { setDebugInfo('No active subscription, going to onboarding'); router.replace('/onboarding'); return }
+        if (!subscription?.status || !activeStatuses.includes(subscription.status)) { log('No active subscription, going to onboarding'); router.replace('/onboarding'); return }
       } catch (e) {
-        setDebugInfo('/me fetch error: ' + String(e)); router.replace('/onboarding'); return
+        log('/me fetch error: ' + String(e)); router.replace('/onboarding'); return
       }
       router.replace('/studio')
     }
@@ -38,33 +39,47 @@ export default function AuthCallbackPage() {
       const tokenHash = params.get('token_hash')
       const type = params.get('type')
       const hash = window.location.hash
-      setDebugInfo(`code=${code?.slice(0,8) ?? 'null'} token_hash=${!!tokenHash} type=${type} hash="${hash.slice(0,40)}" search="${window.location.search.slice(0,80)}"`)
+      log(`code=${code?.slice(0,8) ?? 'null'} token_hash=${!!tokenHash} type=${type} hash="${hash.slice(0,40)}" search="${window.location.search.slice(0,80)}"`)
 
       // Invite link — exchange token then send to set-password page
       if (tokenHash && type === 'invite') {
-        setDebugInfo('Exchanging invite token…')
+        log('Exchanging invite token…')
         const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' })
-        setDebugInfo(`verifyOtp: session=${!!data?.session} error=${error?.message ?? 'none'}`)
+        log(`verifyOtp: session=${!!data?.session} error=${error?.message ?? 'none'}`)
         if (error || !data.session) { router.replace('/login'); return }
         router.replace('/auth/reset-password')
         return
       }
 
       if (code) {
-        setDebugInfo('Exchanging code for session…')
+        log('Exchanging code for session…')
         const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-        setDebugInfo(`exchangeCodeForSession: session=${!!data?.session} error=${error?.message ?? 'none'}`)
+        log(`exchangeCodeForSession: session=${!!data?.session} error=${error?.message ?? 'none'}`)
         if (error || !data.session) return
         await handleSession(data.session)
         return
       }
 
-      setDebugInfo('No code in URL, checking getSession…')
+      // Implicit flow — tokens in hash fragment
+      if (hash.includes('access_token')) {
+        log('Implicit flow detected, parsing hash…')
+        const hashParams = new URLSearchParams(hash.slice(1))
+        const access_token = hashParams.get('access_token')
+        const refresh_token = hashParams.get('refresh_token')
+        log(`access_token=${access_token?.slice(0,8) ?? 'null'} refresh_token=${!!refresh_token}`)
+        if (access_token && refresh_token) {
+          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
+          log(`setSession: session=${!!data?.session} error=${error?.message ?? 'none'}`)
+          if (data.session) { await handleSession(data.session); return }
+        }
+      }
+
+      log('No code in URL, checking getSession…')
       const { data: { session } } = await supabase.auth.getSession()
-      setDebugInfo(`getSession: session=${!!session}`)
+      log(`getSession: session=${!!session}`)
       if (session) { await handleSession(session); return }
 
-      setDebugInfo('No session found — check Supabase redirect URL config')
+      log('No session found — search=' + window.location.search + ' hash=' + window.location.hash)
     }
 
     handleCallback()
@@ -74,7 +89,7 @@ export default function AuthCallbackPage() {
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         <p className="text-gray-500 mb-2">Signing you in…</p>
-        <p className="text-xs text-gray-400 font-mono">{debugInfo}</p>
+        {logs.map((l, i) => <p key={i} className="text-xs text-gray-400 font-mono">{l}</p>)}
       </div>
     </main>
   )
