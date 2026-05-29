@@ -93,6 +93,25 @@
       transform: translateY(-1px);
     }
 
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .nav-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--white);
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+
     /* ── HERO ── */
     .hero {
       position: relative;
@@ -988,7 +1007,25 @@
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       nav { padding: 16px 24px; }
-      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0; right: 0;
+        flex-direction: column;
+        gap: 0;
+        background: rgba(11,15,26,0.97);
+        border-bottom: 1px solid var(--navy-border);
+        padding: 8px 24px 16px;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links .nav-link {
+        padding: 13px 0;
+        border-bottom: 1px solid var(--navy-border);
+        font-size: 15px;
+      }
+      .nav-links .nav-link:last-child { border-bottom: none; }
       .hero { padding: 120px 24px 80px; }
       .section { padding: 72px 24px; }
       .value-section { padding: 0 24px 72px; }
@@ -1008,12 +1045,15 @@
   <a href="/" class="nav-logo">
     <img src="logo.png" alt="LocalPod Studio" />
   </a>
-  <div class="nav-links">
+  <div class="nav-links" id="nav-links">
     <a href="/pricing" class="nav-link">Pricing</a>
     <a href="/about" class="nav-link">About</a>
     <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="nav-link">Schedule a free demo</a>
   </div>
   <a href="https://app.localpod.co" class="nav-cta">Log In / Sign Up</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
 
 <!-- HERO -->
@@ -1375,6 +1415,16 @@
     el.style.transform = 'translateY(20px)';
     el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
     observer.observe(el);
+  });
+</script>
+<script>
+  const hamburger = document.getElementById('nav-hamburger');
+  const navLinks = document.getElementById('nav-links');
+  hamburger.addEventListener('click', () => {
+    navLinks.classList.toggle('open');
+  });
+  navLinks.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => navLinks.classList.remove('open'));
   });
 </script>
 </body>
