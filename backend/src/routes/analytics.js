@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
     // Build a map from megaphoneEpisodeId → our internal episode ID
     const dbEpisodes = await prisma.episode.findMany({
-      where: { show: { organizationId: req.user.organization.id }, megaphoneEpisodeId: { not: null } },
+      where: { show: { organizationId: req.user.organization.id }, megaphoneEpisodeId: { not: null }, deletedAt: null },
       select: { id: true, megaphoneEpisodeId: true },
     });
     const internalIdByMegaphone = Object.fromEntries(dbEpisodes.map(e => [e.megaphoneEpisodeId, e.id]));

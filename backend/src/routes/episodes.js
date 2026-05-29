@@ -22,8 +22,8 @@ router.get('/', async (req, res) => {
 
   const episodes = await prisma.episode.findMany({
     where: showId
-      ? { showId, show: { organizationId: orgId } }
-      : { show: { organizationId: orgId } },
+      ? { showId, show: { organizationId: orgId }, deletedAt: null }
+      : { show: { organizationId: orgId }, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -226,7 +226,7 @@ router.delete('/:id', async (req, res) => {
       } catch { /* non-fatal */ }
     }
 
-    await prisma.episode.delete({ where: { id } });
+    await prisma.episode.update({ where: { id }, data: { deletedAt: new Date() } });
     res.json({ deleted: true });
   } catch (err) {
     console.error('Delete episode error:', err.message);

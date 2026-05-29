@@ -68,6 +68,7 @@ model Episode {
   publishedUrl       String?
   megaphoneEpisodeId String?
   characterCount     Int?
+  deletedAt          DateTime?
   adMarkers          String?   // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
   adAssignments      String?   // JSON: [{ campaignId, type, insertAt? }] — campaigns to stitch at publish
   scheduledAt        DateTime?

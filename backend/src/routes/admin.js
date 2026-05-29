@@ -41,7 +41,7 @@ router.get('/publishers', async (req, res) => {
       _sum: { characterCount: true },
     }),
     prisma.episode.findMany({
-      where: { showId: { in: showIds } },
+      where: { showId: { in: showIds }, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: { showId: true, createdAt: true, status: true },
       distinct: ['showId'],
