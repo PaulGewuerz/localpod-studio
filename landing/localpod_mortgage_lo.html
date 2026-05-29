@@ -28,8 +28,21 @@
   .nav-logo span { font-weight: 700; }
   .footer-logo { font-family: "Montserrat", sans-serif; font-size: 18px; color: white; text-decoration: none; letter-spacing: -0.2px; }
   .footer-logo span { font-weight: 700; }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-link { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  .nav-link:hover { color: white; }
   .nav-cta { background: white; color: var(--navy); font-size: 14px; font-weight: 600; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: opacity 0.2s; }
   .nav-cta:hover { opacity: 0.88; }
+  .nav-hamburger { display: none; flex-direction: column; justify-content: center; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
+  .nav-hamburger span { display: block; width: 22px; height: 2px; background: white; border-radius: 2px; transition: all 0.2s; }
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    .nav-hamburger { display: flex; }
+    .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; gap: 0; background: rgba(11,15,26,0.97); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 8px 24px 16px; }
+    .nav-links.open { display: flex; }
+    .nav-links .nav-link { padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 15px; }
+    .nav-links .nav-link:last-child { border-bottom: none; }
+  }
 
   .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 130px 40px 80px; max-width: 1100px; margin: 0 auto; }
   .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 28px; }
@@ -133,7 +146,15 @@
 
 <nav>
   <a href="https://localpod.co" class="nav-logo"><span>LocalPod</span> Studio</a>
-  <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="nav-cta">Book a free demo</a>
+  <div class="nav-links" id="nav-links">
+    <a href="/pricing" class="nav-link">Pricing</a>
+    <a href="/about" class="nav-link">About</a>
+    <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="nav-link">Schedule a free demo</a>
+  </div>
+  <a href="https://app.localpod.co" class="nav-cta">Log In / Sign Up</a>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Open menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
 
 <div class="hero">
@@ -252,5 +273,13 @@
   <p>© 2026 LocalPod Studio. All rights reserved.</p>
 </footer>
 
+<script>
+  const hamburger = document.getElementById('nav-hamburger');
+  const navLinks = document.getElementById('nav-links');
+  hamburger.addEventListener('click', () => { navLinks.classList.toggle('open'); });
+  navLinks.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => navLinks.classList.remove('open'));
+  });
+</script>
 </body>
 </html>
