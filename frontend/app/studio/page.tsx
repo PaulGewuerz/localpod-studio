@@ -401,6 +401,7 @@ function StudioInner() {
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [loadingEpisodes, setLoadingEpisodes] = useState(true)
   const [episodeRefreshKey, setEpisodeRefreshKey] = useState(0)
+  const [monthlyCharacters, setMonthlyCharacters] = useState(0)
 
   // New Episode form state
   const [epMode, setEpMode] = useState<'ai' | 'upload'>('ai')
@@ -528,10 +529,15 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         const url = activeShowId
           ? `${API_URL}/episodes?showId=${activeShowId}`
           : `${API_URL}/episodes`
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) setEpisodes(await res.json())
+        const [epRes, usageRes] = await Promise.all([
+          fetch(url, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/episodes/usage`, { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+        if (epRes.ok) setEpisodes(await epRes.json())
+        if (usageRes.ok) {
+          const data = await usageRes.json()
+          setMonthlyCharacters(data.monthlyCharacters)
+        }
       } catch { /* silent */ }
       finally { setLoadingEpisodes(false) }
     }
@@ -804,9 +810,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   ).length
   const isSolo = me?.subscription?.plan === 'solo'
   const CHARACTER_LIMIT = isSolo ? 50_000 : 150_000
-  const monthlyCharCount = episodes
-    .filter(e => new Date(e.createdAt) >= startOfMonth && e.characterCount != null)
-    .reduce((sum, e) => sum + (e.characterCount ?? 0), 0)
+  const monthlyCharCount = monthlyCharacters
 
   // ── Sidebar nav item ──────────────────────────────────────────────────────────
 

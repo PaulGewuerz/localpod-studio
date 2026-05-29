@@ -10,6 +10,17 @@ const { getHostingAdapter } = require('../adapters/hosting');
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
 
+router.get('/usage', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const usage = await prisma.episode.aggregate({
+    where: { show: { organizationId: orgId }, createdAt: { gte: startOfMonth } },
+    _sum: { characterCount: true },
+  });
+  res.json({ monthlyCharacters: usage._sum.characterCount ?? 0 });
+});
+
 router.get('/', async (req, res) => {
   const orgId = req.user.organization.id;
   const { showId } = req.query;
