@@ -50,6 +50,25 @@ async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
   });
 }
 
+async function sendDistributionRequestAdmin({ orgName, showName, rssUrl, userEmail }) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
+  await resend.emails.send({
+    from: FROM,
+    to: adminEmail,
+    subject: `Directory submission requested — ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:18px;font-weight:600;margin-bottom:8px">Directory submission request</h1>
+        <p style="color:#555;margin-bottom:8px"><strong>Org:</strong> ${orgName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Show:</strong> ${showName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>RSS:</strong> ${rssUrl}</p>
+        <p style="color:#555;margin-bottom:24px"><strong>Requested by:</strong> ${userEmail}</p>
+        <p style="color:#999;font-size:12px;margin-top:40px">LocalPod Studio</p>
+      </div>
+    `,
+  });
+}
+
 async function sendDistributionRequestConfirmation({ to, showName }) {
   await resend.emails.send({
     from: FROM,
@@ -74,4 +93,4 @@ async function sendDistributionRequestConfirmation({ to, showName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation };
+module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };

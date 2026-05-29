@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { sendSMS } = require('../notify');
-const { sendDistributionRequestConfirmation } = require('../email');
+const { sendDistributionRequestConfirmation, sendDistributionRequestAdmin } = require('../email');
 
 router.post('/submit-request', async (req, res) => {
   const { showId } = req.body;
@@ -20,6 +20,7 @@ router.post('/submit-request', async (req, res) => {
     await Promise.all([
       sendSMS(`LocalPod: Directory submission requested\nOrg: ${req.user.organization.name}\nShow: ${showName}\nRSS: ${rssUrl}\nRequested by: ${userEmail}`),
       sendDistributionRequestConfirmation({ to: userEmail, showName }),
+      sendDistributionRequestAdmin({ orgName: req.user.organization.name, showName, rssUrl, userEmail }),
     ]);
 
     res.json({ ok: true });
