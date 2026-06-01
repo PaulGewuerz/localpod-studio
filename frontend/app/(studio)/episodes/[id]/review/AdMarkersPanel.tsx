@@ -195,11 +195,38 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   }
 
   async function handlePreview() {
+    const unmarkedMidRoll = [...assignments.values()].find(a => a.type === 'mid-roll' && a.insertAt == null)
+    if (unmarkedMidRoll) {
+      setPreviewError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
+      return
+    }
     setPreviewing(true)
     setPreviewUrl(null)
     setPreviewError(null)
     try {
       const token = await getToken()
+      const assignmentList = [...assignments.values()]
+      const derivedMarkers = {
+        preRoll:  assignmentList.some(a => a.type === 'pre-roll'),
+        postRoll: assignmentList.some(a => a.type === 'post-roll'),
+        midRoll:  assignmentList.filter(a => a.type === 'mid-roll' && a.insertAt != null).map(a => a.insertAt as number),
+      }
+
+      // Save current assignments first so the preview reflects what's on screen
+      await Promise.all([
+        fetch(`${API_URL}/episodes/${episodeId}/ad-assignments`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ assignments: assignmentList }),
+        }),
+        fetch(`${API_URL}/episodes/${episodeId}/ad-markers`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(derivedMarkers),
+        }),
+      ])
+      setSaved(true)
+
       const res = await fetch(`${API_URL}/episodes/${episodeId}/preview-audio`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
