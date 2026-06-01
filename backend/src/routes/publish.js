@@ -31,7 +31,11 @@ router.post('/', async (req, res) => {
 
   try {
     const adapter = getHostingAdapter();
-    const adMarkers = episode.adMarkers ? JSON.parse(episode.adMarkers) : null;
+    // Don't send Megaphone DAI slots when local stitching is in use — the ad is
+    // already baked into the audio. Sending postCount/preCount on a podcast that
+    // doesn't have DAI enabled causes Megaphone to get stuck in "processing".
+    const hasLocalStitching = !!episode.adAssignments;
+    const adMarkers = (!hasLocalStitching && episode.adMarkers) ? JSON.parse(episode.adMarkers) : null;
     const audioUrl = await preparePublishAudio(episode, orgId, prisma);
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
