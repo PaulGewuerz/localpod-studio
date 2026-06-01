@@ -31,13 +31,13 @@ router.get('/publishers', async (req, res) => {
   const [totalStats, monthlyStats, latestEpisodes] = await Promise.all([
     prisma.episode.groupBy({
       by: ['showId'],
-      where: { showId: { in: showIds } },
+      where: { showId: { in: showIds }, deletedAt: null },
       _count: { id: true },
       _sum: { characterCount: true },
     }),
     prisma.episode.groupBy({
       by: ['showId'],
-      where: { showId: { in: showIds }, createdAt: { gte: startOfMonth } },
+      where: { showId: { in: showIds }, deletedAt: null, createdAt: { gte: startOfMonth } },
       _sum: { characterCount: true },
     }),
     prisma.episode.findMany({
