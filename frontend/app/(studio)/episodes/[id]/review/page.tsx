@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdMarkersPanel from './AdMarkersPanel'
@@ -68,6 +68,10 @@ export default function EpisodeReviewPage() {
   const [editedDescription, setEditedDescription] = useState('')
   const [savingMeta, setSavingMeta] = useState(false)
 
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playingEndRef = useRef<number>(0)
+  const [playingOrder, setPlayingOrder] = useState<number | null>(null)
+
   const [approving, setApproving] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
@@ -104,6 +108,20 @@ export default function EpisodeReviewPage() {
     load()
   }, [id])
 
+  // Stop paragraph audio when episode audio URL changes (e.g. after regen)
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ''
+      setPlayingOrder(null)
+    }
+  }, [episode?.audioUrl])
+
+  // Stop and clean up on unmount
+  useEffect(() => {
+    return () => { audioRef.current?.pause() }
+  }, [])
+
   // Fetch download count for published episodes
   useEffect(() => {
     if (!episode?.megaphoneEpisodeId || episode.status !== 'published') return
@@ -119,7 +137,37 @@ export default function EpisodeReviewPage() {
     )
   }, [episode?.megaphoneEpisodeId, episode?.status])
 
+  function playParagraph(para: ParagraphMeta) {
+    if (!episode?.audioUrl) return
+    if (!audioRef.current) audioRef.current = new Audio()
+    const audio = audioRef.current
+
+    if (playingOrder === para.order) {
+      audio.pause()
+      setPlayingOrder(null)
+      return
+    }
+
+    if (audio.src !== episode.audioUrl) audio.src = episode.audioUrl
+    playingEndRef.current = para.timeEnd
+
+    // Replace the timeupdate listener each play so it always checks the current end
+    audio.ontimeupdate = () => {
+      if (audio.currentTime >= playingEndRef.current) {
+        audio.pause()
+        setPlayingOrder(null)
+      }
+    }
+    audio.onended = () => setPlayingOrder(null)
+
+    audio.currentTime = para.timeStart
+    setPlayingOrder(para.order)
+    audio.play().catch(() => setPlayingOrder(null))
+  }
+
   function startEditParagraph(para: ParagraphMeta) {
+    audioRef.current?.pause()
+    setPlayingOrder(null)
     setEditingOrder(para.order)
     setEditedText(para.text)
     setActionError(null)
@@ -439,12 +487,27 @@ export default function EpisodeReviewPage() {
                       </div>
                     ) : (
                       <div
-                        className="px-3.5 py-3"
+                        className="px-3.5 py-3 flex items-start gap-2"
                         onClick={() => editingOrder === null && startEditParagraph(para)}
                       >
-                        <p className="text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
+                        <p className="flex-1 text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
                           {para.text}
                         </p>
+                        <button
+                          onClick={e => { e.stopPropagation(); playParagraph(para) }}
+                          className="shrink-0 mt-0.5 w-6 h-6 flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+                          title={playingOrder === para.order ? 'Stop' : 'Play paragraph'}
+                        >
+                          {playingOrder === para.order ? (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                              <rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/>
+                            </svg>
+                          ) : (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                              <path d="M2 1.5l7 3.5-7 3.5V1.5z"/>
+                            </svg>
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>

@@ -511,4 +511,31 @@ router.patch('/:id/ad-markers', async (req, res) => {
   res.json({ episodeId: id });
 });
 
+// POST /episodes/:id/preview-audio — stitch ad campaigns into episode audio and return a preview URL
+router.post('/:id/preview-audio', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+
+  if (!episode.audioUrl) {
+    return res.status(400).json({ error: 'Episode has no audio' });
+  }
+
+  try {
+    const audioUrl = await preparePublishAudio(episode, orgId, prisma);
+    res.json({ audioUrl });
+  } catch (err) {
+    console.error('Preview audio error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to generate preview' });
+  }
+});
+
 module.exports = router;

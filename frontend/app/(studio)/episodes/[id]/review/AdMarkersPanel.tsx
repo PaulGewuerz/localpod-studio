@@ -75,6 +75,9 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   const hasMidRollAssigned = [...assignments.values()].some(a => a.type === 'mid-roll')
 
@@ -189,6 +192,29 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       next.set(campaignId, { ...existing, insertAt: t })
       return next
     })
+  }
+
+  async function handlePreview() {
+    setPreviewing(true)
+    setPreviewUrl(null)
+    setPreviewError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${episodeId}/preview-audio`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || 'Preview failed')
+      }
+      const { audioUrl } = await res.json()
+      setPreviewUrl(audioUrl)
+    } catch (err: unknown) {
+      setPreviewError(err instanceof Error ? err.message : 'Preview failed.')
+    } finally {
+      setPreviewing(false)
+    }
   }
 
   async function handleSave() {
@@ -331,20 +357,42 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
             })}
           </div>
 
-          {/* Single save */}
-          <div className="flex items-center gap-3 pt-1 border-t border-[var(--rule)]">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
-            >
-              {saving ? 'Saving…' : isPublished ? 'Save & sync →' : 'Save'}
-            </button>
-            {saved && !saving && (
-              <span className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Saved — will stitch on next publish</span>
+          {/* Save + preview */}
+          <div className="flex flex-col gap-3 pt-1 border-t border-[var(--rule)]">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+              >
+                {saving ? 'Saving…' : isPublished ? 'Save & sync →' : 'Save'}
+              </button>
+              {assignments.size > 0 && (
+                <button
+                  onClick={handlePreview}
+                  disabled={previewing}
+                  className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--ink)] border border-[var(--rule)] hover:border-[var(--ink-faint)] disabled:opacity-50 rounded-[2px] transition-colors"
+                >
+                  {previewing ? (
+                    <span className="flex items-center gap-2">
+                      <span className="lp-spin inline-block w-3 h-3 border-2 border-[var(--ink-faint)]/30 border-t-[var(--ink-faint)] rounded-full" />
+                      Stitching…
+                    </span>
+                  ) : 'Preview with ads →'}
+                </button>
+              )}
+              {saved && !saving && (
+                <span className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Saved</span>
+              )}
+              {saveError && (
+                <span className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{saveError}</span>
+              )}
+            </div>
+            {previewUrl && (
+              <audio key={previewUrl} controls src={previewUrl} className="w-full" />
             )}
-            {saveError && (
-              <span className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{saveError}</span>
+            {previewError && (
+              <span className="text-[11px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{previewError}</span>
             )}
           </div>
         </>
