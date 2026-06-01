@@ -219,6 +219,12 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
 
   async function handleSave() {
     setSaving(true); setSaveError(null); setSaved(false)
+    const unmarkedMidRoll = [...assignments.values()].find(a => a.type === 'mid-roll' && a.insertAt == null)
+    if (unmarkedMidRoll) {
+      setSaveError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
+      setSaving(false)
+      return
+    }
     try {
       const token = await getToken()
       const assignmentList = [...assignments.values()]
