@@ -13,9 +13,11 @@ const AUDIO_BUCKET = 'audio';
 router.get('/usage', async (req, res) => {
   const orgId = req.user.organization.id;
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const subscription = await prisma.subscription.findUnique({ where: { organizationId: orgId } });
+  const periodStart = subscription?.currentPeriodStart
+    ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const usage = await prisma.episode.aggregate({
-    where: { show: { organizationId: orgId }, createdAt: { gte: startOfMonth } },
+    where: { show: { organizationId: orgId }, createdAt: { gte: periodStart } },
     _sum: { characterCount: true },
   });
   res.json({ monthlyCharacters: usage._sum.characterCount ?? 0 });

@@ -124,7 +124,10 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         if (obj.subscription) {
           await prisma.subscription.updateMany({
             where: { stripeCustomerId: obj.customer },
-            data: { status: 'active' },
+            data: {
+              status: 'active',
+              ...(obj.period_start ? { currentPeriodStart: new Date(obj.period_start * 1000) } : {}),
+            },
           });
         }
         break;

@@ -110,6 +110,7 @@ model Subscription {
   plan                 String?
   stripeCustomerId     String?
   stripeSubscriptionId String?
+  currentPeriodStart   DateTime?
   createdAt            DateTime     @default(now())
   organizationId       String       @unique
   organization         Organization @relation(fields: [organizationId], references: [id])

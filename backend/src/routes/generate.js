@@ -68,9 +68,10 @@ router.post('/', async (req, res) => {
   // Enforce monthly character limit
   const CHARACTER_LIMIT = 150_000;
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodStart = org.subscription?.currentPeriodStart
+    ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const usage = await prisma.episode.aggregate({
-    where: { show: { organizationId: org.id }, createdAt: { gte: startOfMonth } },
+    where: { show: { organizationId: org.id }, createdAt: { gte: periodStart } },
     _sum: { characterCount: true },
   });
   const usedChars = usage._sum.characterCount ?? 0;
