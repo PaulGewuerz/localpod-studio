@@ -80,6 +80,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   const hasMidRollAssigned = [...assignments.values()].some(a => a.type === 'mid-roll')
+  const hasAnyAssigned = assignments.size > 0
 
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
@@ -119,10 +120,10 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   // When the waveform div becomes visible, WaveSurfer needs to recalculate
   // its canvas dimensions (they were 0 while the container was display:none)
   useEffect(() => {
-    if (hasMidRollAssigned && wsRef.current) {
+    if (hasAnyAssigned && wsRef.current) {
       window.dispatchEvent(new Event('resize'))
     }
-  }, [hasMidRollAssigned])
+  }, [hasAnyAssigned])
 
   useEffect(() => {
     async function load() {
@@ -299,14 +300,40 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         </p>
       ) : (
         <>
-          {/* Waveform — only shown when a mid-roll is assigned */}
+          {/* Waveform — shown when any ad is assigned; markers show each ad's position */}
           {audioUrl && (
-            <div className={hasMidRollAssigned ? '' : 'hidden'}>
+            <div className={hasAnyAssigned ? '' : 'hidden'}>
               <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] mb-2">
-                {waveReady ? 'Scrub to the mid-roll position, then click Mark here' : 'Loading waveform…'}
+                {!waveReady ? 'Loading waveform…' : hasMidRollAssigned ? 'Scrub to the mid-roll position, then click Mark here' : 'Ad positions shown on waveform'}
               </div>
               <div className="relative rounded-[2px] overflow-hidden">
                 <div ref={containerRef} />
+                {waveReady && duration > 0 && [...assignments.values()].map(a => {
+                  const pos = a.type === 'pre-roll' ? 0
+                            : a.type === 'post-roll' ? 100
+                            : a.insertAt != null ? (a.insertAt / duration) * 100 : null
+                  if (pos === null) return null
+                  const color = a.type === 'pre-roll' ? 'var(--green)'
+                              : a.type === 'mid-roll' ? 'var(--blue)'
+                              : 'var(--accent)'
+                  const label = a.type === 'pre-roll' ? 'Pre' : a.type === 'mid-roll' ? 'Mid' : 'Post'
+                  const transform = pos === 0 ? 'none' : pos === 100 ? 'translateX(-100%)' : 'translateX(-50%)'
+                  return (
+                    <div
+                      key={a.campaignId}
+                      className="absolute top-0 h-full pointer-events-none flex flex-col"
+                      style={{ left: `${pos}%`, transform }}
+                    >
+                      <span
+                        className="px-1 text-[9px] font-semibold font-[family-name:var(--font-dm-mono)] leading-none py-0.5"
+                        style={{ color, backgroundColor: 'rgba(255,255,255,0.85)' }}
+                      >
+                        {label}
+                      </span>
+                      <div className="flex-1 w-px opacity-75" style={{ backgroundColor: color }} />
+                    </div>
+                  )
+                })}
               </div>
               {waveReady && (
                 <div className="flex items-center gap-3 mt-2">
