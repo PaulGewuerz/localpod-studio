@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 interface AdAssignment {
+  id: string        // unique per placement
   campaignId: string
   type: string
   insertAt?: number
@@ -25,7 +26,7 @@ interface Props {
   episodeId: string
   isPublished: boolean
   initialMarkers: { preRoll: boolean; postRoll: boolean; midRoll: number[] } | null
-  initialAssignments: AdAssignment[]
+  initialAssignments: Omit<AdAssignment, 'id'>[]
   getToken: () => Promise<string>
 }
 
@@ -54,6 +55,10 @@ function saveCachedPeaks(episodeId: string, peaks: number[][]) {
   try { localStorage.setItem(PEAKS_CACHE_PREFIX + episodeId, JSON.stringify(peaks)) } catch { /* quota */ }
 }
 
+function makeId() {
+  return Math.random().toString(36).slice(2)
+}
+
 export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialAssignments, getToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,11 +72,9 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   )
 
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([])
-  const [assignments, setAssignments] = useState<Map<string, AdAssignment>>(() => {
-    const m = new Map<string, AdAssignment>()
-    for (const a of initialAssignments) m.set(a.campaignId, a)
-    return m
-  })
+  const [assignments, setAssignments] = useState<AdAssignment[]>(() =>
+    initialAssignments.map((a, i) => ({ ...a, id: `${a.campaignId}_${i}` }))
+  )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -79,8 +82,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
 
-  const hasMidRollAssigned = [...assignments.values()].some(a => a.type === 'mid-roll')
-  const hasAnyAssigned = assignments.size > 0
+  const hasMidRollAssigned = assignments.some(a => a.type === 'mid-roll')
+  const hasAnyAssigned = assignments.length > 0
 
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
@@ -103,7 +106,6 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
       ws.on('ready', () => {
         setDuration(ws.getDuration())
         setWaveReady(true)
-        // Cache peaks so next load is instant
         if (!cachedPeaks) {
           try { saveCachedPeaks(episodeId, ws.exportPeaks()) } catch { /* non-fatal */ }
         }
@@ -141,17 +143,19 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
           const me = await meRes.json()
           const defaults = me.show?.adMarkerDefaults ? JSON.parse(me.show.adMarkerDefaults) : null
           if (defaults) {
-            const auto = new Map<string, AdAssignment>()
+            const auto: AdAssignment[] = []
             const now = Date.now()
             for (const c of active) {
               const inWindow =
                 (!c.startDate || new Date(c.startDate).getTime() <= now) &&
                 (!c.endDate || new Date(c.endDate).getTime() >= now)
               if (!inWindow) continue
-              if (c.type === 'pre-roll' && defaults.preRoll) auto.set(c.id, { campaignId: c.id, type: 'pre-roll' })
-              else if (c.type === 'post-roll' && defaults.postRoll) auto.set(c.id, { campaignId: c.id, type: 'post-roll' })
+              if (c.type === 'pre-roll' && defaults.preRoll)
+                auto.push({ id: makeId(), campaignId: c.id, type: 'pre-roll' })
+              else if (c.type === 'post-roll' && defaults.postRoll)
+                auto.push({ id: makeId(), campaignId: c.id, type: 'post-roll' })
             }
-            if (auto.size > 0) setAssignments(auto)
+            if (auto.length > 0) setAssignments(auto)
           }
         }
       } catch { /* silent */ }
@@ -162,41 +166,43 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
   function toggleCampaign(campaign: AdCampaign) {
     setSaved(false)
     setAssignments(prev => {
-      const next = new Map(prev)
-      if (next.has(campaign.id)) next.delete(campaign.id)
-      else next.set(campaign.id, { campaignId: campaign.id, type: campaign.type })
-      return next
+      const hasCampaign = prev.some(a => a.campaignId === campaign.id)
+      if (hasCampaign) return prev.filter(a => a.campaignId !== campaign.id)
+      return [...prev, { id: makeId(), campaignId: campaign.id, type: campaign.type }]
     })
   }
 
-  function setAssignmentType(campaignId: string, type: string) {
+  function addPlacement(campaign: AdCampaign) {
+    setSaved(false)
+    setAssignments(prev => [...prev, { id: makeId(), campaignId: campaign.id, type: campaign.type }])
+  }
+
+  function removePlacement(placementId: string) {
+    setSaved(false)
+    setAssignments(prev => prev.filter(a => a.id !== placementId))
+  }
+
+  function setAssignmentType(placementId: string, type: string) {
     setSaved(false)
     if (type === 'mid-roll') setWaveEnabled(true)
-    setAssignments(prev => {
-      const next = new Map(prev)
-      const existing = next.get(campaignId)
-      if (!existing) return prev
-      const updated: AdAssignment = { ...existing, type }
+    setAssignments(prev => prev.map(a => {
+      if (a.id !== placementId) return a
+      const updated = { ...a, type }
       if (type !== 'mid-roll') delete updated.insertAt
-      next.set(campaignId, updated)
-      return next
-    })
+      return updated
+    }))
   }
 
-  function markCampaignHere(campaignId: string) {
+  function markCampaignHere(placementId: string) {
     const t = Math.round(currentTime * 10) / 10
     setSaved(false)
-    setAssignments(prev => {
-      const next = new Map(prev)
-      const existing = next.get(campaignId)
-      if (!existing) return prev
-      next.set(campaignId, { ...existing, insertAt: t })
-      return next
-    })
+    setAssignments(prev => prev.map(a =>
+      a.id === placementId ? { ...a, insertAt: t } : a
+    ))
   }
 
   async function handlePreview() {
-    const unmarkedMidRoll = [...assignments.values()].find(a => a.type === 'mid-roll' && a.insertAt == null)
+    const unmarkedMidRoll = assignments.find(a => a.type === 'mid-roll' && a.insertAt == null)
     if (unmarkedMidRoll) {
       setPreviewError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
       return
@@ -206,11 +212,10 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
     setPreviewError(null)
     try {
       const token = await getToken()
-      const assignmentList = [...assignments.values()]
       const derivedMarkers = {
-        preRoll:  assignmentList.some(a => a.type === 'pre-roll'),
-        postRoll: assignmentList.some(a => a.type === 'post-roll'),
-        midRoll:  assignmentList.filter(a => a.type === 'mid-roll' && a.insertAt != null).map(a => a.insertAt as number),
+        preRoll:  assignments.some(a => a.type === 'pre-roll'),
+        postRoll: assignments.some(a => a.type === 'post-roll'),
+        midRoll:  assignments.filter(a => a.type === 'mid-roll' && a.insertAt != null).map(a => a.insertAt as number),
       }
 
       // Save current assignments first so the preview reflects what's on screen
@@ -218,7 +223,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         fetch(`${API_URL}/episodes/${episodeId}/ad-assignments`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ assignments: assignmentList }),
+          body: JSON.stringify({ assignments }),
         }),
         fetch(`${API_URL}/episodes/${episodeId}/ad-markers`, {
           method: 'PATCH',
@@ -236,8 +241,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || 'Preview failed')
       }
-      const { audioUrl } = await res.json()
-      setPreviewUrl(audioUrl)
+      const { audioUrl: url } = await res.json()
+      setPreviewUrl(url)
     } catch (err: unknown) {
       setPreviewError(err instanceof Error ? err.message : 'Preview failed.')
     } finally {
@@ -247,7 +252,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
 
   async function handleSave() {
     setSaving(true); setSaveError(null); setSaved(false)
-    const unmarkedMidRoll = [...assignments.values()].find(a => a.type === 'mid-roll' && a.insertAt == null)
+    const unmarkedMidRoll = assignments.find(a => a.type === 'mid-roll' && a.insertAt == null)
     if (unmarkedMidRoll) {
       setSaveError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
       setSaving(false)
@@ -255,20 +260,17 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
     }
     try {
       const token = await getToken()
-      const assignmentList = [...assignments.values()]
-
-      // Derive adMarkers from assignments so Megaphone DAI slots stay in sync
       const derivedMarkers = {
-        preRoll:  assignmentList.some(a => a.type === 'pre-roll'),
-        postRoll: assignmentList.some(a => a.type === 'post-roll'),
-        midRoll:  assignmentList.filter(a => a.type === 'mid-roll' && a.insertAt != null).map(a => a.insertAt as number),
+        preRoll:  assignments.some(a => a.type === 'pre-roll'),
+        postRoll: assignments.some(a => a.type === 'post-roll'),
+        midRoll:  assignments.filter(a => a.type === 'mid-roll' && a.insertAt != null).map(a => a.insertAt as number),
       }
 
       await Promise.all([
         fetch(`${API_URL}/episodes/${episodeId}/ad-assignments`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ assignments: assignmentList }),
+          body: JSON.stringify({ assignments }),
         }),
         fetch(`${API_URL}/episodes/${episodeId}/ad-markers`, {
           method: 'PATCH',
@@ -308,7 +310,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
               </div>
               <div className="relative rounded-[2px] overflow-hidden">
                 <div ref={containerRef} />
-                {waveReady && duration > 0 && [...assignments.values()].map(a => {
+                {waveReady && duration > 0 && assignments.map(a => {
                   const pos = a.type === 'pre-roll' ? 0
                             : a.type === 'post-roll' ? 100
                             : a.insertAt != null ? (a.insertAt / duration) * 100 : null
@@ -320,7 +322,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
                   const transform = pos === 0 ? 'none' : pos === 100 ? 'translateX(-100%)' : 'translateX(-50%)'
                   return (
                     <div
-                      key={a.campaignId}
+                      key={a.id}
                       className="absolute top-0 h-full pointer-events-none flex flex-col"
                       style={{ left: `${pos}%`, transform }}
                     >
@@ -362,30 +364,39 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
           {/* Campaign list */}
           <div className="space-y-2">
             {activeCampaigns.map(c => {
-              const assignment = assignments.get(c.id)
-              const checked = !!assignment
-              const assignedType = assignment?.type ?? c.type
+              const campaignPlacements = assignments.filter(a => a.campaignId === c.id)
+              const checked = campaignPlacements.length > 0
 
               return (
                 <div key={c.id} className="rounded-[2px] border border-[var(--rule)] p-3 space-y-2">
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCampaign(c)}
-                      className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
-                    />
-                    <span className="text-[13px] text-[var(--ink)] font-medium">{c.name}</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCampaign(c)}
+                        className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
+                      />
+                      <span className="text-[13px] text-[var(--ink)] font-medium">{c.name}</span>
+                    </label>
+                    {checked && (
+                      <button
+                        onClick={() => addPlacement(c)}
+                        className="text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+                      >
+                        + Add
+                      </button>
+                    )}
+                  </div>
 
-                  {checked && (
-                    <div className="ml-6 flex items-center gap-2 flex-wrap">
+                  {campaignPlacements.map(placement => (
+                    <div key={placement.id} className="ml-6 flex items-center gap-2 flex-wrap">
                       {AD_TYPES.map(t => (
                         <button
                           key={t.value}
-                          onClick={() => setAssignmentType(c.id, t.value)}
+                          onClick={() => setAssignmentType(placement.id, t.value)}
                           className={`px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] rounded-[2px] border transition-colors ${
-                            assignedType === t.value
+                            placement.type === t.value
                               ? 'bg-[var(--ink)] text-white border-[var(--ink)]'
                               : 'bg-white text-[var(--ink-faint)] border-[var(--rule)] hover:text-[var(--ink)] hover:border-[var(--ink-faint)]'
                           }`}
@@ -394,24 +405,32 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
                         </button>
                       ))}
 
-                      {assignedType === 'mid-roll' && (
+                      {placement.type === 'mid-roll' && (
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => markCampaignHere(c.id)}
+                            onClick={() => markCampaignHere(placement.id)}
                             disabled={!waveReady}
                             className="px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--accent)] border border-[var(--accent)] rounded-[2px] hover:bg-red-50 disabled:opacity-40 transition-colors"
                           >
                             Mark here
                           </button>
                           <span className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] tabular-nums">
-                            {assignment?.insertAt != null
-                              ? `→ ${formatTime(assignment.insertAt)}`
+                            {placement.insertAt != null
+                              ? `→ ${formatTime(placement.insertAt)}`
                               : waveReady ? `cursor at ${formatTime(currentTime)}` : audioUrl ? 'loading…' : 'no audio'}
                           </span>
                         </div>
                       )}
+
+                      <button
+                        onClick={() => removePlacement(placement.id)}
+                        className="ml-auto text-[13px] leading-none text-[var(--ink-faint)] hover:text-[var(--accent)] transition-colors"
+                        title="Remove placement"
+                      >
+                        ×
+                      </button>
                     </div>
-                  )}
+                  ))}
                 </div>
               )
             })}
@@ -427,7 +446,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
               >
                 {saving ? 'Saving…' : isPublished ? 'Save & sync →' : 'Save'}
               </button>
-              {assignments.size > 0 && (
+              {hasAnyAssigned && (
                 <button
                   onClick={handlePreview}
                   disabled={previewing}
