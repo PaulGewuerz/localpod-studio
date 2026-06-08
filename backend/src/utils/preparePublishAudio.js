@@ -97,8 +97,9 @@ async function preparePublishAudio(episode, orgId, prisma) {
 
   if (!Object.keys(campaignAudioUrls).length) return ensureMp3(episode.audioUrl, orgId, episode.id);
 
-  // stitchCampaigns always outputs MP3, so no conversion needed after stitching
-  const stitchedBuffer = await stitchCampaigns(episode.audioUrl, assignments, campaignAudioUrls);
+  // Ensure episode audio is MP3 before stitching — ffmpeg can't stream-copy AAC into .mp3 segments
+  const episodeMp3Url = await ensureMp3(episode.audioUrl, orgId, episode.id);
+  const stitchedBuffer = await stitchCampaigns(episodeMp3Url, assignments, campaignAudioUrls);
   if (!stitchedBuffer) return ensureMp3(episode.audioUrl, orgId, episode.id);
 
   const storagePath = `stitched/${orgId}/${episode.id}_${Date.now()}.mp3`;

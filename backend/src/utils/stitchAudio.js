@@ -63,6 +63,7 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
   const tmp = os.tmpdir();
   const id = `lp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+  const rawPath    = path.join(tmp, `${id}_raw`);
   const fullPath   = path.join(tmp, `${id}_full.mp3`);
   const beforePath = path.join(tmp, `${id}_before.mp3`);
   const newPath    = path.join(tmp, `${id}_new.mp3`);
@@ -70,7 +71,10 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
   const outPath    = path.join(tmp, `${id}_out.mp3`);
 
   try {
-    await downloadToTemp(fullAudioUrl, fullPath);
+    await downloadToTemp(fullAudioUrl, rawPath);
+    // Normalise to MP3 so cutSegment can stream-copy cleanly regardless of source format
+    await execAsync(`ffmpeg -y -i "${rawPath}" -acodec libmp3lame -ar 44100 -ab 128k -ac 2 "${fullPath}"`);
+    await fs.unlink(rawPath).catch(() => {});
     await fs.writeFile(newPath, newAudioBuffer);
 
     const segments = [];
@@ -94,7 +98,7 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
     await concatSegments(segments, outPath);
     return await fs.readFile(outPath);
   } finally {
-    await Promise.all([fullPath, beforePath, newPath, afterPath, outPath]
+    await Promise.all([rawPath, fullPath, beforePath, newPath, afterPath, outPath]
       .map(p => fs.unlink(p).catch(() => {})));
   }
 }
