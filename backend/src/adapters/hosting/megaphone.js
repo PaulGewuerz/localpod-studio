@@ -241,6 +241,7 @@ class MegaphoneAdapter {
     const body = {};
     if (updates.title !== undefined)       body.title = updates.title;
     if (updates.description !== undefined) body.summary = updates.description;
+    if (updates.pubdate !== undefined)     body.pubdate = updates.pubdate;
     if (updates.adMarkers !== undefined) {
       body.preCount = updates.adMarkers.preRoll ? 1 : 0;
       body.postCount = updates.adMarkers.postRoll ? 1 : 0;

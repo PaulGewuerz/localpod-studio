@@ -31,6 +31,7 @@ interface Episode {
   adMarkers: string | null
   adAssignments: string | null
   megaphoneEpisodeId: string | null
+  scheduledAt: string | null
   createdAt: string
   voice: { name: string } | null
 }
@@ -286,10 +287,11 @@ export default function EpisodeReviewPage() {
     if (!scheduleDate) { setActionError('Please pick a date and time.'); return }
     setScheduling(true)
     setActionError(null)
+    const isReschedule = episode!.status === 'scheduled'
     try {
       const token = await getToken()
       const res = await fetch(`${API_URL}/schedule`, {
-        method: 'POST',
+        method: isReschedule ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           episodeId: id,
@@ -299,9 +301,12 @@ export default function EpisodeReviewPage() {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d.error || `Schedule failed (${res.status})`)
+        throw new Error(d.error || `${isReschedule ? 'Reschedule' : 'Schedule'} failed (${res.status})`)
       }
-      router.push('/studio?nav=episodes')
+      const data = await res.json()
+      setEpisode(prev => prev ? { ...prev, scheduledAt: data.scheduledFor } : prev)
+      setShowSchedule(false)
+      setScheduleDate('')
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
       setScheduling(false)
@@ -602,7 +607,7 @@ export default function EpisodeReviewPage() {
                 disabled={scheduling || !scheduleDate}
                 className="px-4 py-2 text-[13px] font-semibold text-white bg-[var(--blue)] hover:opacity-90 disabled:opacity-50 rounded-[2px] transition-colors"
               >
-                {scheduling ? 'Scheduling…' : 'Confirm Schedule →'}
+                {scheduling ? (episode.status === 'scheduled' ? 'Rescheduling…' : 'Scheduling…') : (episode.status === 'scheduled' ? 'Confirm Reschedule →' : 'Confirm Schedule →')}
               </button>
               <button
                 onClick={() => { setShowSchedule(false); setScheduleDate(''); setActionError(null) }}
@@ -624,11 +629,19 @@ export default function EpisodeReviewPage() {
               </button>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => { setShowSchedule(true); setActionError(null) }}
-                  disabled={episode.status === 'published' || episode.status === 'scheduled'}
+                  disabled={episode.status === 'published'}
+                  onClick={() => {
+                    if (episode.status === 'scheduled' && episode.scheduledAt) {
+                      const d = new Date(episode.scheduledAt)
+                      const pad = (n: number) => String(n).padStart(2, '0')
+                      setScheduleDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+                    }
+                    setShowSchedule(true)
+                    setActionError(null)
+                  }}
                   className="px-4 py-2 text-[13px] font-semibold text-[var(--blue)] border border-[var(--blue)] rounded-[2px] hover:bg-[var(--blue-light)] disabled:opacity-40 transition-colors"
                 >
-                  Schedule →
+                  {episode.status === 'scheduled' ? 'Reschedule →' : 'Schedule →'}
                 </button>
                 <button
                   onClick={handleApprove}
