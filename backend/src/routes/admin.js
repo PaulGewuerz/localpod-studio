@@ -37,7 +37,7 @@ router.get('/publishers', async (req, res) => {
     }),
     prisma.episode.groupBy({
       by: ['showId'],
-      where: { showId: { in: showIds }, createdAt: { gte: startOfMonth } },
+      where: { showId: { in: showIds }, deletedAt: null, createdAt: { gte: startOfMonth } },
       _sum: { characterCount: true },
     }),
     prisma.episode.findMany({
