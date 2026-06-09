@@ -17,7 +17,7 @@ router.get('/usage', async (req, res) => {
   const periodStart = subscription?.currentPeriodStart
     ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const usage = await prisma.episode.aggregate({
-    where: { show: { organizationId: orgId }, deletedAt: null, createdAt: { gte: periodStart }, characterCount: { not: null } },
+    where: { show: { organizationId: orgId }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
   });
   res.json({ monthlyCharacters: usage._sum.characterCount ?? 0 });

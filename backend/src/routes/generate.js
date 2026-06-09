@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
   const periodStart = org.subscription?.currentPeriodStart
     ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const usage = await prisma.episode.aggregate({
-    where: { show: { organizationId: org.id }, deletedAt: null, createdAt: { gte: periodStart }, characterCount: { not: null } },
+    where: { show: { organizationId: org.id }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
   });
   const usedChars = usage._sum.characterCount ?? 0;
