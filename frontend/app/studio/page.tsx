@@ -44,7 +44,7 @@ interface ShowData {
 interface MeData {
   org: { id: string; name: string; defaultVoice: Voice | null }
   shows: ShowData[]
-  subscription: { stripeCustomerId: string | null; status: string; plan: string | null } | null
+  subscription: { stripeCustomerId: string | null; status: string; plan: string | null; trialEndsAt: string | null } | null
 }
 
 type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings' | 'ads'
@@ -497,7 +497,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           if (subscription?.stripeCustomerId) break
         }
         const activeStatuses = ['active', 'trial']
-        if (!subscription?.status || !activeStatuses.includes(subscription.status)) { router.replace('/onboarding'); return }
+        const trialExpired = subscription?.status === 'trial' && !!subscription.trialEndsAt && new Date() > new Date(subscription.trialEndsAt)
+        if (!subscription?.status || !activeStatuses.includes(subscription.status) || trialExpired) { router.replace('/onboarding'); return }
 
         setMe(meData)
         if (meData!.shows.length > 0) setActiveShowId(meData!.shows[0].id)
@@ -695,6 +696,26 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     }
   }
 
+  async function handleCheckout() {
+    setPortalLoading(true)
+    setPortalError(null)
+    try {
+      const token = await getToken()
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${API_URL}/billing/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: session!.user.email, plan: 'publisher', interval: 'monthly' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to start checkout')
+      window.location.href = data.url
+    } catch (err: unknown) {
+      setPortalError(err instanceof Error ? err.message : 'Something went wrong')
+      setPortalLoading(false)
+    }
+  }
+
   async function handleSettingsSave() {
     setSettingsSaving(true)
     setSettingsError(null)
@@ -809,6 +830,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     e.status === 'published' && new Date(e.createdAt) >= startOfMonth
   ).length
   const isSolo = me?.subscription?.plan === 'solo'
+  const isTrial = me?.subscription?.status === 'trial'
+  const trialDaysLeft = me?.subscription?.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(me.subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null
   const CHARACTER_LIMIT = isSolo ? 50_000 : 150_000
   const monthlyCharCount = monthlyCharacters
 
@@ -1284,7 +1309,16 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             <div className="max-w-lg">
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Current Plan</div>
-                {isSolo ? (
+                {isTrial ? (
+                  <>
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">Free Trial</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">
+                      {trialDaysLeft !== null && trialDaysLeft > 0
+                        ? `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining`
+                        : 'Trial ending today'}
+                    </div>
+                  </>
+                ) : isSolo ? (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
                     <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
@@ -1296,50 +1330,71 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   </>
                 )}
               </div>
-              {/* Other plan */}
-              {isSolo ? (
+
+              {isTrial ? (
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
-                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
+                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Subscribe</div>
                   <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Ad Manager · Priority support</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
                   <button
-                    onClick={handlePortal}
+                    onClick={handleCheckout}
                     disabled={portalLoading}
                     className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
                   >
-                    {portalLoading ? 'Opening…' : 'Upgrade →'}
+                    {portalLoading ? 'Opening…' : 'Start subscription →'}
                   </button>
+                  {portalError && (
+                    <p className="mt-3 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{portalError}</p>
+                  )}
                 </div>
               ) : (
-                <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
-                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Downgrade</div>
-                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
-                  <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
-                  <button
-                    onClick={handlePortal}
-                    disabled={portalLoading}
-                    className="px-5 py-2.5 border border-[var(--rule)] text-[var(--ink)] text-[13px] font-semibold rounded-[6px] hover:border-[var(--ink)] disabled:opacity-50 transition-colors"
-                  >
-                    {portalLoading ? 'Opening…' : 'Downgrade →'}
-                  </button>
-                </div>
-              )}
+                <>
+                  {/* Other plan */}
+                  {isSolo ? (
+                    <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
+                      <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
+                      <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Ad Manager · Priority support</div>
+                      <button
+                        onClick={handlePortal}
+                        disabled={portalLoading}
+                        className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                      >
+                        {portalLoading ? 'Opening…' : 'Upgrade →'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
+                      <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Downgrade</div>
+                      <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
+                      <button
+                        onClick={handlePortal}
+                        disabled={portalLoading}
+                        className="px-5 py-2.5 border border-[var(--rule)] text-[var(--ink)] text-[13px] font-semibold rounded-[6px] hover:border-[var(--ink)] disabled:opacity-50 transition-colors"
+                      >
+                        {portalLoading ? 'Opening…' : 'Downgrade →'}
+                      </button>
+                    </div>
+                  )}
 
-              <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
-                <div className="text-[13px] text-[var(--ink-light)] mb-5">
-                  Manage your payment method, download invoices, or cancel your subscription through the Stripe billing portal.
-                </div>
-                <button
-                  onClick={handlePortal}
-                  disabled={portalLoading}
-                  className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
-                >
-                  {portalLoading ? 'Opening…' : 'Manage Billing →'}
-                </button>
-                {portalError && (
-                  <p className="mt-3 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{portalError}</p>
-                )}
-              </div>
+                  <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                    <div className="text-[13px] text-[var(--ink-light)] mb-5">
+                      Manage your payment method, download invoices, or cancel your subscription through the Stripe billing portal.
+                    </div>
+                    <button
+                      onClick={handlePortal}
+                      disabled={portalLoading}
+                      className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                    >
+                      {portalLoading ? 'Opening…' : 'Manage Billing →'}
+                    </button>
+                    {portalError && (
+                      <p className="mt-3 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{portalError}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

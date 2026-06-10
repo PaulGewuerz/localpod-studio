@@ -24,9 +24,14 @@ module.exports = async function requireActiveSubscription(req, res, next) {
     return res.status(403).json({ error: 'User not found' });
   }
 
-  const status = dbUser.organization?.subscription?.status;
+  const subscription = dbUser.organization?.subscription;
+  const status = subscription?.status;
   if (!status || !ALLOWED_STATUSES.includes(status)) {
     return res.status(403).json({ error: 'Active subscription required', subscriptionStatus: status ?? 'none' });
+  }
+
+  if (status === 'trial' && subscription.trialEndsAt && new Date() > subscription.trialEndsAt) {
+    return res.status(403).json({ error: 'Trial expired', subscriptionStatus: 'trial_expired' });
   }
 
   req.user = dbUser;
