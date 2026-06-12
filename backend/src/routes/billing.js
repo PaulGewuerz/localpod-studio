@@ -16,6 +16,21 @@ router.post('/create-checkout-session', async (req, res) => {
   const priceId = PRICE_IDS[plan]?.[interval];
   if (!priceId) return res.status(400).json({ error: `No price configured for plan=${plan} interval=${interval}` });
 
+  // 7-day free trial, card collected up front — Stripe auto-charges at trial
+  // end. Mid-trial users keep their remaining days; expired trials and
+  // returning Stripe customers get no trial (charged immediately).
+  const user = await prisma.user.findFirst({
+    where: { email },
+    include: { organization: { include: { subscription: true } } },
+  });
+  const existingSub = user?.organization?.subscription;
+  let trialDays = 7;
+  if (existingSub?.stripeSubscriptionId) {
+    trialDays = 0;
+  } else if (existingSub?.trialEndsAt) {
+    trialDays = Math.max(0, Math.ceil((new Date(existingSub.trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -23,6 +38,7 @@ router.post('/create-checkout-session', async (req, res) => {
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { plan, interval },
+      ...(trialDays > 0 ? { subscription_data: { trial_period_days: trialDays } } : {}),
       allow_promotion_codes: true,
       success_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/studio?checkout=success`,
       cancel_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/onboarding`,

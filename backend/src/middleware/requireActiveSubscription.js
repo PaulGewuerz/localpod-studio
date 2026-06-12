@@ -30,7 +30,9 @@ module.exports = async function requireActiveSubscription(req, res, next) {
     return res.status(403).json({ error: 'Active subscription required', subscriptionStatus: status ?? 'none' });
   }
 
-  if (status === 'trial' && subscription.trialEndsAt && new Date() > subscription.trialEndsAt) {
+  // Local expiry only applies to card-less trials. Stripe-backed trials are
+  // charged at trial end and flipped to active/payment_failed by webhooks.
+  if (status === 'trial' && !subscription.stripeSubscriptionId && subscription.trialEndsAt && new Date() > subscription.trialEndsAt) {
     return res.status(403).json({ error: 'Trial expired', subscriptionStatus: 'trial_expired' });
   }
 

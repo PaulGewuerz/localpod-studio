@@ -497,7 +497,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           if (subscription?.stripeCustomerId) break
         }
         const activeStatuses = ['active', 'trial']
-        const trialExpired = subscription?.status === 'trial' && !!subscription.trialEndsAt && new Date() > new Date(subscription.trialEndsAt)
+        // Card-on-file trials are converted/canceled by Stripe webhooks; only
+        // card-less trials are locked out locally at expiry.
+        const trialExpired = subscription?.status === 'trial' && !subscription.stripeCustomerId && !!subscription.trialEndsAt && new Date() > new Date(subscription.trialEndsAt)
         if (!subscription?.status || !activeStatuses.includes(subscription.status) || trialExpired) { router.replace('/onboarding'); return }
 
         setMe(meData)
@@ -1316,6 +1318,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       {trialDaysLeft !== null && trialDaysLeft > 0
                         ? `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining`
                         : 'Trial ending today'}
+                      {me?.subscription?.stripeCustomerId ? ' — your subscription starts automatically when the trial ends' : ''}
                     </div>
                   </>
                 ) : isSolo ? (
@@ -1331,7 +1334,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 )}
               </div>
 
-              {isTrial ? (
+              {isTrial && !me?.subscription?.stripeCustomerId ? (
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                   <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Subscribe</div>
                   <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>

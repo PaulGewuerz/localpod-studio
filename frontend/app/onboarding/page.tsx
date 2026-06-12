@@ -9,7 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL
 interface MeData {
   org: { id: string; name: string }
   show: { id: string; name: string; coverArtUrl: string | null } | null
-  subscription: { stripeCustomerId: string | null } | null
+  subscription: { stripeCustomerId: string | null; status: string; trialEndsAt: string | null } | null
 }
 
 async function getToken(): Promise<string> {
@@ -202,7 +202,7 @@ export default function OnboardingPage() {
           const meRes2 = await fetch(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })
           if (!meRes2.ok) { router.replace('/login'); return }
           const meData2: MeData = await meRes2.json()
-          if (meData2.subscription?.stripeCustomerId) { router.replace('/studio'); return }
+          if (meData2.subscription?.stripeCustomerId && ['active', 'trial'].includes(meData2.subscription.status)) { router.replace('/studio'); return }
           setMe(meData2)
           setShowName(meData2.show?.name ?? meData2.org.name)
           return
@@ -211,8 +211,8 @@ export default function OnboardingPage() {
 
         const meData: MeData = await meRes.json()
 
-        // Already onboarded
-        if (meData.subscription?.stripeCustomerId) { router.replace('/studio'); return }
+        // Already onboarded (canceled/failed subscriptions stay here to resubscribe)
+        if (meData.subscription?.stripeCustomerId && ['active', 'trial'].includes(meData.subscription.status)) { router.replace('/studio'); return }
 
         setMe(meData)
         setShowName(meData.show?.name ?? meData.org.name)
@@ -302,6 +302,12 @@ export default function OnboardingPage() {
       </main>
     )
   }
+
+  // Days of free trial Stripe Checkout will grant (mirrors backend logic):
+  // fresh accounts get 7, mid-trial users their remaining days, expired 0.
+  const trialDays = me.subscription?.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(me.subscription.trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : 7
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
@@ -423,7 +429,11 @@ export default function OnboardingPage() {
           {step === 2 && (
             <>
               <h1 className="text-xl font-semibold text-gray-900 mb-1">Choose a plan</h1>
-              <p className="text-sm text-gray-500 mb-5">Start publishing today. Cancel anytime.</p>
+              <p className="text-sm text-gray-500 mb-5">
+                {trialDays > 0
+                  ? `Start with a ${trialDays}-day free trial — you won't be charged until it ends. Cancel anytime.`
+                  : 'Your free trial has ended. Subscribe to keep publishing. Cancel anytime.'}
+              </p>
 
               {/* Billing interval toggle */}
               <div className="flex items-center gap-2 mb-5">
@@ -490,7 +500,7 @@ export default function OnboardingPage() {
                 disabled={saving}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors"
               >
-                {saving ? 'Redirecting to checkout…' : 'Activate account →'}
+                {saving ? 'Redirecting to checkout…' : trialDays > 0 ? 'Start free trial →' : 'Activate account →'}
               </button>
               <button onClick={() => setStep(1)} className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700">
                 Back

@@ -39,10 +39,9 @@ router.post('/register', async (req, res) => {
         create: { name: orgName },
       },
       subscription: {
-        create: {
-          status: 'trial',
-          trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
+        // Trial starts when Stripe Checkout completes (card on file, 7-day
+        // trial_period_days) so trials auto-convert to paid at day 7.
+        create: { status: 'pending' },
       },
     },
     include: { subscription: true, shows: { take: 1 } },

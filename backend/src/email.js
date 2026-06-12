@@ -32,6 +32,42 @@ async function sendWelcomeEmail({ to, showName }) {
   });
 }
 
+async function sendTrialEndingEmail({ to, showName, plan, amount, interval, chargeDate }) {
+  const planName = plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
+  const dateStr = chargeDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const amountStr = amount != null
+    ? `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`
+    : null;
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Your LocalPod free trial ends on ${dateStr}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:22px;font-weight:600;margin-bottom:8px">Your free trial is ending soon.</h1>
+        <p style="color:#555;margin-bottom:16px">
+          The free trial for <strong>${showName}</strong> ends on <strong>${dateStr}</strong>.
+          ${amountStr
+            ? `On that date, the card on file will be charged <strong>${amountStr}</strong> for the ${planName} plan, and then every ${interval} after that.`
+            : `On that date, your ${planName} subscription will begin.`}
+        </p>
+        <p style="color:#555;margin-bottom:24px">
+          Want to make changes or cancel before then? Open Billing in your studio —
+          or just reply to this email and we'll take care of it.
+        </p>
+        <a href="${STUDIO_URL}/studio?nav=billing"
+           style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
+                  padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">
+          Manage Billing →
+        </a>
+        <p style="color:#999;font-size:12px;margin-top:40px">
+          LocalPod Studio · If you have questions, reply to this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
   const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
   await resend.emails.send({
@@ -93,4 +129,4 @@ async function sendDistributionRequestConfirmation({ to, showName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };

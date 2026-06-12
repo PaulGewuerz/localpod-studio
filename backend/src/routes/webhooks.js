@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
-const { sendWelcomeEmail } = require('../email');
+const { sendWelcomeEmail, sendTrialEndingEmail } = require('../email');
 const { sendSMS } = require('../notify');
 const { getHostingAdapter } = require('../adapters/hosting');
 
@@ -31,12 +31,15 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           });
           if (user?.organization?.subscription) {
             const plan = obj.metadata?.plan ?? 'publisher';
+            const stripeSub = obj.subscription ? await stripe.subscriptions.retrieve(obj.subscription) : null;
+            const isTrialing = stripeSub?.status === 'trialing';
             await prisma.subscription.update({
               where: { organizationId: user.organization.id },
               data: {
                 stripeCustomerId: obj.customer,
                 stripeSubscriptionId: obj.subscription,
-                status: 'active',
+                status: isTrialing ? 'trial' : 'active',
+                trialEndsAt: isTrialing && stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
                 plan,
               },
             });
@@ -88,7 +91,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             }).catch(err => console.error('Welcome email failed:', err.message));
 
             // Alert owner
-            sendSMS(`New LocalPod subscriber: ${obj.customer_email} (${show?.name ?? user.organization.name})`)
+            sendSMS(`New LocalPod ${isTrialing ? 'trial (card on file)' : 'subscriber'}: ${obj.customer_email} (${show?.name ?? user.organization.name})`)
               .catch(err => console.error('SMS alert failed:', err.message));
           }
         }
@@ -98,8 +101,31 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       case 'customer.subscription.created': {
         await prisma.subscription.updateMany({
           where: { stripeCustomerId: obj.customer },
-          data: { status: 'active' },
+          data: { status: obj.status === 'trialing' ? 'trial' : 'active' },
         });
+        break;
+      }
+
+      // Fired by Stripe 3 days before a trial ends — send the pre-charge
+      // reminder (required by card network rules to avoid disputes).
+      case 'customer.subscription.trial_will_end': {
+        const sub = await prisma.subscription.findFirst({
+          where: { stripeSubscriptionId: obj.id },
+          include: { organization: { include: { users: true, shows: { take: 1 } } } },
+        });
+        if (sub?.organization && obj.trial_end) {
+          const price = obj.items?.data?.[0]?.price;
+          for (const orgUser of sub.organization.users) {
+            sendTrialEndingEmail({
+              to: orgUser.email,
+              showName: sub.organization.shows[0]?.name ?? sub.organization.name,
+              plan: sub.plan ?? 'publisher',
+              amount: price?.unit_amount != null ? price.unit_amount / 100 : null,
+              interval: price?.recurring?.interval ?? 'month',
+              chargeDate: new Date(obj.trial_end * 1000),
+            }).catch(err => console.error('Trial reminder email failed:', err.message));
+          }
+        }
         break;
       }
 
@@ -120,8 +146,9 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       }
 
       case 'invoice.payment_succeeded': {
-        // Only update if this is for a subscription (not a one-off invoice)
-        if (obj.subscription) {
+        // Only update for subscription invoices with a real charge — trials
+        // fire a $0 invoice at signup which must not flip status to active.
+        if (obj.subscription && obj.amount_paid > 0) {
           await prisma.subscription.updateMany({
             where: { stripeCustomerId: obj.customer },
             data: {
@@ -135,6 +162,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 
       case 'customer.subscription.updated': {
         const status = obj.status === 'active' ? 'active'
+          : obj.status === 'trialing' ? 'trial'
           : obj.status === 'past_due' ? 'payment_failed'
           : obj.status === 'canceled' ? 'inactive'
           : obj.status;
@@ -148,7 +176,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: obj.id },
-          data: { status, ...(plan ? { plan } : {}) },
+          data: {
+            status,
+            ...(plan ? { plan } : {}),
+            ...(obj.trial_end ? { trialEndsAt: new Date(obj.trial_end * 1000) } : {}),
+          },
         });
         break;
       }
