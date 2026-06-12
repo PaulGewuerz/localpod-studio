@@ -4,6 +4,7 @@ const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
 const { spliceSegment } = require('../utils/stitchAudio');
+const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
 
@@ -282,15 +283,15 @@ router.post('/:id/regenerate', async (req, res) => {
     console.log('[TTS regenerate] first 200 chars:', normalizedText.slice(0, 200));
   }
 
-  // Call ElevenLabs
+  // Call ElevenLabs with-timestamps endpoint so paragraphMeta stays in sync with the new audio
   let audioBuffer;
+  let paragraphMeta = null;
   try {
-    const response = await fetch(`${ELEVENLABS_API_URL}/${episode.voice.elevenLabsId}`, {
+    const response = await fetch(`${ELEVENLABS_API_URL}/${episode.voice.elevenLabsId}/with-timestamps`, {
       method: 'POST',
       headers: {
         'xi-api-key': process.env.ELEVENLABS_API_KEY,
         'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg',
       },
       body: JSON.stringify({
         text: normalizedText,
@@ -305,7 +306,13 @@ router.post('/:id/regenerate', async (req, res) => {
       return res.status(response.status).json({ error: err.detail?.message || 'ElevenLabs API error' });
     }
 
-    audioBuffer = Buffer.from(await response.arrayBuffer());
+    const ttsData = await response.json();
+    audioBuffer = Buffer.from(ttsData.audio_base64, 'base64');
+
+    if (ttsData.alignment) {
+      const paragraphs = splitIntoParagraphs(normalizedText);
+      paragraphMeta = computeParagraphMeta(normalizedText, paragraphs, ttsData.alignment);
+    }
   } catch (err) {
     console.error('ElevenLabs error:', err.message);
     return res.status(500).json({ error: 'Failed to generate audio' });
@@ -326,7 +333,13 @@ router.post('/:id/regenerate', async (req, res) => {
 
   const updated = await prisma.episode.update({
     where: { id },
-    data: { audioUrl: publicUrl, scriptText, characterCount: normalizedText.length, status: 'draft' },
+    data: {
+      audioUrl: publicUrl,
+      scriptText,
+      characterCount: normalizedText.length,
+      paragraphMeta: paragraphMeta ? JSON.stringify(paragraphMeta) : null,
+      status: 'draft',
+    },
   });
 
   res.json({ episodeId: updated.id, audioUrl: updated.audioUrl, status: updated.status });
