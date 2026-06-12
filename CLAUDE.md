@@ -3,7 +3,7 @@
 ## Project Overview
 LocalPod Studio is a multi-tenant SaaS platform that automatically converts news articles into AI-narrated podcast episodes. It uses ElevenLabs TTS (Multilingual v2) for audio generation and Megaphone for RSS hosting and distribution. Customers are local news publishers, newsletter operators, and regional media groups.
 
-**Current status: Pre-launch. Core pipeline is working end-to-end. Focus is bug fixes and polish on the dashboard, login, and onboarding flow before demo calls begin.**
+**Current status: Pre-launch. Core pipeline is working end-to-end. Dashboard/login/onboarding polish is done. Current focus: the automatic episode flow.**
 
 ---
 
@@ -42,7 +42,7 @@ localpod-studio/
 - Google OAuth via `madetoorderaudio.com` parent org
 
 ### Key Integrations
-- **ElevenLabs** — TTS generation (Multilingual v2); ~4,500 credits per 900-word article
+- **ElevenLabs** — TTS generation (`eleven_turbo_v2_5` with `language_code: 'en'` to prevent accent drift); ~4,500 credits per 900-word article
 - **Megaphone** — RSS hosting and episode publishing via API (Professional plan, $99/month); legacy campaign API sunsets July 14, 2026 — any DAI work must target v2
 - **Stripe** — Billing; webhooks point to `https://api.localpod.co/webhooks/stripe`
 - **Resend** — SMTP for Supabase auth emails, sent from `paul@localpod.co`
@@ -62,9 +62,9 @@ Episodes move through: **draft → approved → published**
 ---
 
 ## Current Focus
-**Bug fixes and polish before launch.** Known rough areas:
-- Dashboard UI
-- Login and onboarding flow
+**Automatic episode flow** — getting articles converted into published episodes without manual steps.
+
+Design decision (2026-06-12): spoken-only episodes are generated **single-pass** — one ElevenLabs `/with-timestamps` call for the full script. Per-paragraph regeneration (splice via ffmpeg) is the surgical edit path only, not the generation path. Full regeneration recomputes `paragraphMeta` (fixed in `22d116c`).
 
 Do not refactor working code or introduce new features unless explicitly asked. Prefer minimal, targeted fixes.
 
