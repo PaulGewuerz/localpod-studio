@@ -1,5 +1,7 @@
 # LocalPod Studio — Claude Code Context
 
+> **Session state lives in [STATUS.md](STATUS.md)** — read it at the start of every session for current focus, TODOs, and recent decisions. Update it at the end of every session.
+
 ## Project Overview
 LocalPod Studio is a multi-tenant SaaS platform that automatically converts news articles into AI-narrated podcast episodes. It uses ElevenLabs TTS (Multilingual v2) for audio generation and Megaphone for RSS hosting and distribution. Customers are local news publishers, newsletter operators, and regional media groups.
 
