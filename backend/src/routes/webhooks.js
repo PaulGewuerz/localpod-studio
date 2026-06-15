@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
-const { sendWelcomeEmail, sendTrialEndingEmail } = require('../email');
+const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail } = require('../email');
 const { sendSMS } = require('../notify');
 const { getHostingAdapter } = require('../adapters/hosting');
 
@@ -182,6 +182,33 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             ...(obj.trial_end ? { trialEndsAt: new Date(obj.trial_end * 1000) } : {}),
           },
         });
+
+        // Detect the exact moment cancel-at-period-end is turned on (the user
+        // canceled from the billing portal). previous_attributes only contains
+        // cancel_at_period_end when it just changed, so this fires once.
+        const prev = event.data.previous_attributes;
+        if (obj.cancel_at_period_end === true && prev?.cancel_at_period_end === false) {
+          const accessEndsDate = obj.cancel_at ? new Date(obj.cancel_at * 1000)
+            : obj.trial_end ? new Date(obj.trial_end * 1000)
+            : obj.current_period_end ? new Date(obj.current_period_end * 1000)
+            : null;
+          const sub = await prisma.subscription.findFirst({
+            where: { stripeSubscriptionId: obj.id },
+            include: { organization: { include: { users: true, shows: { take: 1 } } } },
+          });
+          if (sub?.organization) {
+            const showName = sub.organization.shows[0]?.name ?? sub.organization.name;
+            for (const orgUser of sub.organization.users) {
+              sendCancellationEmail({ to: orgUser.email, showName, accessEndsDate })
+                .catch(err => console.error('Cancellation email failed:', err.message));
+            }
+            const customerEmail = sub.organization.users[0]?.email ?? 'unknown';
+            sendCancellationAdminEmail({ orgName: sub.organization.name, showName, userEmail: customerEmail, accessEndsDate })
+              .catch(err => console.error('Cancellation admin email failed:', err.message));
+            sendSMS(`LocalPod cancellation: ${customerEmail} (${showName}) — access ends ${accessEndsDate ? accessEndsDate.toISOString().slice(0, 10) : 'period end'}`)
+              .catch(err => console.error('Cancellation SMS failed:', err.message));
+          }
+        }
         break;
       }
     }

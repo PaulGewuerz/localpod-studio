@@ -68,6 +68,62 @@ async function sendTrialEndingEmail({ to, showName, plan, amount, interval, char
   });
 }
 
+async function sendCancellationEmail({ to, showName, accessEndsDate }) {
+  const dateStr = accessEndsDate
+    ? accessEndsDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Your LocalPod subscription has been canceled`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:22px;font-weight:600;margin-bottom:8px">Your cancellation is confirmed.</h1>
+        <p style="color:#555;margin-bottom:16px">
+          We've canceled the subscription for <strong>${showName}</strong>.
+          ${dateStr
+            ? `You'll keep full access until <strong>${dateStr}</strong>, and you won't be charged again.`
+            : `You won't be charged again.`}
+        </p>
+        <p style="color:#555;margin-bottom:24px">
+          Changed your mind? You can resubscribe anytime from the billing page —
+          or just reply to this email and we'll help.
+        </p>
+        <a href="${STUDIO_URL}/studio?nav=billing"
+           style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
+                  padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">
+          Manage Billing →
+        </a>
+        <p style="color:#999;font-size:12px;margin-top:40px">
+          LocalPod Studio · If you have questions, reply to this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
+async function sendCancellationAdminEmail({ orgName, showName, userEmail, accessEndsDate }) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
+  const dateStr = accessEndsDate
+    ? accessEndsDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'period end';
+  await resend.emails.send({
+    from: FROM,
+    to: adminEmail,
+    subject: `Subscription canceled — ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:18px;font-weight:600;margin-bottom:8px">Subscription canceled</h1>
+        <p style="color:#555;margin-bottom:8px"><strong>Org:</strong> ${orgName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Show:</strong> ${showName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Customer:</strong> ${userEmail}</p>
+        <p style="color:#555;margin-bottom:24px"><strong>Access ends:</strong> ${dateStr}</p>
+        <p style="color:#999;font-size:12px;margin-top:40px">LocalPod Studio</p>
+      </div>
+    `,
+  });
+}
+
 async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
   const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
   await resend.emails.send({
@@ -129,4 +185,4 @@ async function sendDistributionRequestConfirmation({ to, showName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };

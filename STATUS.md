@@ -1,7 +1,7 @@
 # LocalPod Studio — Status & TODO
 
 > Living doc. Update this at the end of every working session.
-> Last updated: 2026-06-12
+> Last updated: 2026-06-15
 
 ---
 
@@ -19,13 +19,24 @@
 
 ## TODO — Automatic episode flow
 
-- [ ] **Decide the entry point** — how articles get in: RSS feed per show? Submitted URL? Email? (Blocks everything below.)
-- [ ] Article ingestion (fetch + extract text from the chosen source)
-- [ ] Auto-generate: run ingested articles through the existing `/generate` pipeline (pronunciation rules → normalize → single-pass TTS)
-- [ ] Per-show automation settings (on/off, voice, auto-publish vs. land-as-draft for review)
-- [ ] Trigger mechanism (cron/poller on Railway — nothing scheduled exists in the backend today)
-- [ ] Auto-publish path to Megaphone for shows set to full-auto
-- [ ] Failure handling + notification (bad article, TTS error, character limit hit)
+**v1 shipped (`bb8a89b`, 2026-06-15): RSS feed → draft episodes.** Entry point is RSS per show; everything lands as a draft for review (no auto-publish).
+
+Done:
+- [x] Entry point decided: **RSS feed per show**
+- [x] Article ingestion — `automation/feedPoller.js` (feed content first, page-fetch + Readability fallback)
+- [x] Auto-generate via shared `services/generateEpisode.js` (same pipeline as manual `/generate`)
+- [x] Per-show settings: `feedUrl` / `automationEnabled` / `automationVoiceId` (PATCH /me + studio Settings UI)
+- [x] Trigger: in-process poller in the backend, every 15 min (prod only, or `ENABLE_FEED_POLLER=true` locally)
+- [x] Migration applied to Supabase via `scripts/apply-automation-migration.js`
+- [x] Validated: schema queryable + feed parse + extraction (no TTS spent in testing)
+
+Still open:
+- [ ] **End-to-end live test** — enable automation on a real show with a real feed, confirm a draft actually gets created (will spend ElevenLabs credits)
+- [ ] **Failure visibility** — `IngestedArticle.status` is `failed`/`skipped` with an `error`, but there's no UI/notification surfacing it yet
+- [ ] Auto-publish path to Megaphone for shows set to full-auto (v2)
+- [ ] Per-article notification email on success/failure (v2)
+- [ ] Consider tightening page-fetch timeout (NPR feed hung 20s on the Readability fallback; poller handles it gracefully but it's slow)
+- [ ] `jsdom` + `@mozilla/readability` carry npm-audit vulns (3 high) — acceptable for server-side fetch, but noted
 
 ## TODO — Other open items
 
@@ -37,6 +48,7 @@
 
 ## Done (recent, newest first)
 
+- Automatic episode flow v1: RSS feed → draft episodes (`bb8a89b`)
 - Free trial moved into Stripe: card up front, auto-charge at day 7, reminder email (`b8f1882`)
 - Full-regenerate fix: `/with-timestamps` + `paragraphMeta` recompute (`22d116c`)
 - 7-day free trial with expiry enforcement; landing/pricing copy (`4f57e70`, `0d0bcd5`, `78f70b1`)
