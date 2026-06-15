@@ -40,6 +40,7 @@ Still open:
 
 ## TODO — Other open items
 
+- [ ] **Stripe cancellation work landed under a mislabeled commit** — `sendCancellationEmail`/`sendCancellationAdminEmail` (email.js) + `cancel_at_period_end` webhook handler + GET /me cancellation read were accidentally swept into commit `146caaf` ("Update STATUS.md"). Code is complete, syntax-clean, and **live in production**. Only downside is the commit message; fixing it cleanly needs a force-push to `master`. **Decision pending:** leave as-is or rewrite history.
 - [ ] **Megaphone legacy campaign API sunsets July 14, 2026** — any DAI work must target v2 before then
 - [ ] Decide fate of untracked working-tree files: `backend/test-output-*.mp3`, `backend/scripts/debug-show.js`, `frontend/netlify.toml`, `landing/generating-screenshot.html` (gitignore, commit, or delete)
 - [ ] Voice roster update in `backend/prisma/seed.js` (9 voices) — uncommitted; needs commit + seed run against Supabase to take effect
@@ -49,6 +50,7 @@ Still open:
 ## Done (recent, newest first)
 
 - Automatic episode flow v1: RSS feed → draft episodes (`bb8a89b`)
+- Stripe cancellation emails (customer + admin) on cancel-at-period-end (`146caaf` — see Other open items re: commit message)
 - Free trial moved into Stripe: card up front, auto-charge at day 7, reminder email (`b8f1882`)
 - Full-regenerate fix: `/with-timestamps` + `paragraphMeta` recompute (`22d116c`)
 - 7-day free trial with expiry enforcement; landing/pricing copy (`4f57e70`, `0d0bcd5`, `78f70b1`)
