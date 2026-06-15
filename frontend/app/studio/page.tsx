@@ -39,12 +39,15 @@ interface ShowData {
   coverArtUrl: string | null
   megaphoneShowId: string | null
   megaphoneRssUrl: string | null
+  feedUrl: string | null
+  automationEnabled: boolean
+  automationVoiceId: string | null
 }
 
 interface MeData {
   org: { id: string; name: string; defaultVoice: Voice | null }
   shows: ShowData[]
-  subscription: { stripeCustomerId: string | null; status: string; plan: string | null; trialEndsAt: string | null } | null
+  subscription: { stripeCustomerId: string | null; status: string; plan: string | null; trialEndsAt: string | null; cancelAtPeriodEnd?: boolean; cancelAt?: string | null } | null
 }
 
 type NavKey = 'dashboard' | 'new' | 'episodes' | 'analytics' | 'billing' | 'shows' | 'dist' | 'settings' | 'ads'
@@ -436,6 +439,9 @@ function StudioInner() {
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [settingsSaved, setSettingsSaved] = useState(false)
+  const [settingsFeedUrl, setSettingsFeedUrl] = useState('')
+  const [settingsAutomationEnabled, setSettingsAutomationEnabled] = useState(false)
+  const [settingsAutomationVoiceId, setSettingsAutomationVoiceId] = useState('')
   const settingsCoverRef = useRef<HTMLInputElement>(null)
   const settingsDescriptionRef = useRef<HTMLDivElement>(null)
 
@@ -558,6 +564,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       if (settingsDescriptionRef.current) settingsDescriptionRef.current.innerHTML = raw
       setSettingsCoverPreview(activeShow.coverArtUrl ?? null)
       setSettingsCoverFile(null)
+      setSettingsFeedUrl(activeShow.feedUrl ?? '')
+      setSettingsAutomationEnabled(activeShow.automationEnabled ?? false)
+      setSettingsAutomationVoiceId(activeShow.automationVoiceId ?? '')
       setSettingsError(null)
       setSettingsSaved(false)
     }
@@ -748,6 +757,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           showName: settingsName || undefined,
           description: settingsDescription || undefined,
           ...(coverArtUrl ? { coverArtUrl } : {}),
+          feedUrl: settingsFeedUrl.trim(),
+          automationEnabled: settingsAutomationEnabled,
+          automationVoiceId: settingsAutomationVoiceId || null,
         }),
       })
       if (!patchRes.ok) {
@@ -765,6 +777,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           name: settingsName || s.name,
           description: settingsDescription || s.description,
           ...(cacheBustedUrl ? { coverArtUrl: cacheBustedUrl } : {}),
+          feedUrl: settingsFeedUrl.trim() || null,
+          automationEnabled: settingsAutomationEnabled,
+          automationVoiceId: settingsAutomationVoiceId || null,
         } : s),
       } : prev)
 
@@ -835,6 +850,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   const isTrial = me?.subscription?.status === 'trial'
   const trialDaysLeft = me?.subscription?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(me.subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null
+  const cancelPending = me?.subscription?.cancelAtPeriodEnd === true
+  const cancelDateStr = me?.subscription?.cancelAt
+    ? new Date(me.subscription.cancelAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
   const CHARACTER_LIMIT = isSolo ? 50_000 : 150_000
   const monthlyCharCount = monthlyCharacters
@@ -1309,6 +1328,17 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           {/* ── BILLING ───────────────────────────────────────────────── */}
           {activeNav === 'billing' && (
             <div className="max-w-lg">
+              {cancelPending && (
+                <div className="bg-[#fdf6e9] border border-[#e8d9b5] rounded-[8px] px-6 py-4 mb-4">
+                  <div className="text-[13px] text-[#7a5b1e]">
+                    <span className="font-semibold">Subscription set to cancel.</span>{' '}
+                    {cancelDateStr
+                      ? `You'll keep access until ${cancelDateStr}, and you won't be charged again.`
+                      : `You'll keep access until the end of your current period, and you won't be charged again.`}{' '}
+                    Changed your mind? Reopen billing to resubscribe.
+                  </div>
+                </div>
+              )}
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Current Plan</div>
                 {isTrial ? (
@@ -1318,7 +1348,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       {trialDaysLeft !== null && trialDaysLeft > 0
                         ? `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining`
                         : 'Trial ending today'}
-                      {me?.subscription?.stripeCustomerId ? ' — your subscription starts automatically when the trial ends' : ''}
+                      {me?.subscription?.stripeCustomerId && !cancelPending ? ' — your subscription starts automatically when the trial ends' : ''}
                     </div>
                   </>
                 ) : isSolo ? (
@@ -1620,6 +1650,64 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] min-h-[100px] leading-relaxed cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
                   data-placeholder="Describe your podcast…"
                 />
+              </div>
+
+              {/* Automatic Episodes */}
+              <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1">
+                      Automatic Episodes
+                    </label>
+                    <p className="text-[13px] text-[var(--ink-light)] leading-relaxed max-w-[460px]">
+                      Poll an RSS feed and turn new articles into draft episodes automatically. Drafts always wait for your review — nothing publishes on its own.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settingsAutomationEnabled}
+                    onClick={() => setSettingsAutomationEnabled(v => !v)}
+                    className={`shrink-0 mt-1 w-11 h-6 rounded-full transition-colors relative ${settingsAutomationEnabled ? 'bg-[var(--ink)]' : 'bg-[var(--rule)]'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settingsAutomationEnabled ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+
+                <div className="mt-5">
+                  <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                    Source RSS Feed
+                  </label>
+                  <input
+                    type="url"
+                    value={settingsFeedUrl}
+                    onChange={e => setSettingsFeedUrl(e.target.value)}
+                    placeholder="https://yoursite.com/feed/"
+                    className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)]"
+                  />
+                </div>
+
+                <div className="mt-5">
+                  <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                    Voice for Auto Episodes
+                  </label>
+                  <select
+                    value={settingsAutomationVoiceId}
+                    onChange={e => setSettingsAutomationVoiceId(e.target.value)}
+                    className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] bg-white"
+                  >
+                    <option value="">Use organization default voice</option>
+                    {voices.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {settingsAutomationEnabled && !settingsFeedUrl.trim() && (
+                  <p className="mt-4 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">
+                    Add a feed URL above for automation to run.
+                  </p>
+                )}
               </div>
 
               {/* Save */}

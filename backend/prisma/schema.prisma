@@ -40,10 +40,15 @@ model Show {
   adMarkerDefaults    String?      // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
   megaphoneShowId     String?
   megaphoneRssUrl     String?
+  feedUrl             String?      // source RSS feed for automatic episode generation
+  automationEnabled   Boolean      @default(false)
+  automationVoiceId   String?
   createdAt           DateTime     @default(now())
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])
   episodes            Episode[]
+  automationVoice     Voice?       @relation("ShowAutomationVoice", fields: [automationVoiceId], references: [id])
+  ingestedArticles    IngestedArticle[]
 }
 
 model Voice {
@@ -54,6 +59,24 @@ model Voice {
   previewUrl      String?
   episodes        Episode[]
   orgsDefault     Organization[]
+  automationShows Show[]         @relation("ShowAutomationVoice")
+}
+
+// Tracks feed items seen by the automatic episode flow so each article is only generated once.
+model IngestedArticle {
+  id        String   @id @default(uuid())
+  guid      String   // feed item guid, falls back to link
+  url       String?
+  title     String?
+  // pending | generated | failed | skipped
+  status    String   @default("pending")
+  error     String?
+  episodeId String?
+  createdAt DateTime @default(now())
+  showId    String
+  show      Show     @relation(fields: [showId], references: [id])
+
+  @@unique([showId, guid])
 }
 
 model Episode {

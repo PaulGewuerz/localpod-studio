@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
 
@@ -15,6 +16,23 @@ router.get('/', async (req, res) => {
     },
   });
 
+  // Surface pending cancellation (cancel-at-period-end) so the UI can show a
+  // "set to cancel on <date>" banner. Read live from Stripe and never let a
+  // Stripe hiccup break /me.
+  let subscription = org.subscription;
+  if (subscription?.stripeSubscriptionId && ['trial', 'active'].includes(subscription.status)) {
+    try {
+      const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+      subscription = {
+        ...subscription,
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        cancelAt: stripeSub.cancel_at ? new Date(stripeSub.cancel_at * 1000).toISOString() : null,
+      };
+    } catch (err) {
+      console.error('Stripe subscription lookup failed in /me:', err.message);
+    }
+  }
+
   res.json({
     org: {
       id: org.id,
@@ -22,13 +40,13 @@ router.get('/', async (req, res) => {
       defaultVoice: org.defaultVoice ?? null,
     },
     shows: org.shows,
-    subscription: org.subscription,
+    subscription,
   });
 });
 
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
 router.patch('/', async (req, res) => {
-  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults } = req.body;
+  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults, feedUrl, automationEnabled, automationVoiceId } = req.body;
   const orgId = req.user.organization.id;
 
   // Normalize: accept either `categories` (array) or legacy `category` (string)
@@ -38,7 +56,7 @@ router.patch('/', async (req, res) => {
 
   const updates = [];
 
-  if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined || adMarkerDefaults !== undefined) {
+  if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined || adMarkerDefaults !== undefined || feedUrl !== undefined || automationEnabled !== undefined || automationVoiceId !== undefined) {
     const show = showId
       ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
       : await prisma.show.findFirst({ where: { organizationId: orgId } });
@@ -50,6 +68,9 @@ router.patch('/', async (req, res) => {
       if (categoryValue !== undefined)     data.category = categoryValue;
       if (coverArtUrl !== undefined)       data.coverArtUrl = coverArtUrl;
       if (adMarkerDefaults !== undefined)  data.adMarkerDefaults = JSON.stringify(adMarkerDefaults);
+      if (feedUrl !== undefined)           data.feedUrl = feedUrl || null;
+      if (automationEnabled !== undefined) data.automationEnabled = Boolean(automationEnabled);
+      if (automationVoiceId !== undefined) data.automationVoiceId = automationVoiceId || null;
       await prisma.show.update({ where: { id: show.id }, data });
     }
     updates.push('show');
