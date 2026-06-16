@@ -185,4 +185,21 @@ async function sendDistributionRequestConfirmation({ to, showName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin };
+// Adds (or upserts) a contact into the Resend audience used for marketing/
+// re-engagement email. Safe no-op if RESEND_AUDIENCE_ID isn't configured.
+async function addContactToAudience({ email, firstName, lastName }) {
+  const audienceId = process.env.RESEND_AUDIENCE_ID;
+  if (!audienceId) {
+    console.warn('RESEND_AUDIENCE_ID not set — skipping audience add for', email);
+    return;
+  }
+  await resend.contacts.create({
+    audienceId,
+    email,
+    unsubscribed: false,
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, addContactToAudience };

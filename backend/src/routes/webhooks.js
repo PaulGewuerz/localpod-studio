@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
-const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail } = require('../email');
+const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, addContactToAudience } = require('../email');
 const { sendSMS } = require('../notify');
 const { getHostingAdapter } = require('../adapters/hosting');
 
@@ -216,6 +216,40 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     console.error(`Error handling ${event.type}:`, err.message);
     return res.status(500).json({ error: 'Internal error handling webhook' });
   }
+
+  res.json({ received: true });
+});
+
+// Supabase Database Webhook — fires on every INSERT into auth.users, so it
+// catches all signups (Google OAuth and email magic-link alike) and adds the
+// new user to the Resend audience for marketing/re-engagement.
+//
+// Set up in Supabase: Database → Webhooks → new webhook on INSERT to
+// auth.users → method POST, URL https://api.localpod.co/webhooks/supabase-signup,
+// add an HTTP header  x-supabase-webhook-secret: <SUPABASE_WEBHOOK_SECRET>.
+// This router runs before the global express.json(), so parse JSON locally.
+router.post('/supabase-signup', express.json(), async (req, res) => {
+  const secret = req.headers['x-supabase-webhook-secret'];
+  if (!process.env.SUPABASE_WEBHOOK_SECRET || secret !== process.env.SUPABASE_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const record = req.body?.record;
+  const email = record?.email;
+  if (!email) {
+    return res.json({ received: true, skipped: 'no email' });
+  }
+
+  // Google OAuth provides a name in raw_user_meta_data; email signups usually don't.
+  const meta = record.raw_user_meta_data || {};
+  const fullName = (meta.full_name || meta.name || '').trim();
+  const [firstName, ...rest] = fullName ? fullName.split(/\s+/) : [];
+  const lastName = rest.join(' ');
+
+  // Fire-and-forget so Supabase gets a fast 200 and doesn't retry.
+  addContactToAudience({ email, firstName: firstName || undefined, lastName: lastName || undefined })
+    .then(() => console.log('Added to Resend audience:', email))
+    .catch(err => console.error('Resend audience add failed:', err.message));
 
   res.json({ received: true });
 });
