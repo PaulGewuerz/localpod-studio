@@ -562,7 +562,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
   async function markOnboarded() {
     // Optimistically flip local state so the tour never re-triggers this session.
-    setMe(prev => prev && !prev.user.onboardedAt
+    setMe(prev => prev?.user && !prev.user.onboardedAt
       ? { ...prev, user: { ...prev.user, onboardedAt: new Date().toISOString() } }
       : prev)
     try {
@@ -580,7 +580,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
   // Auto-launch once for users who haven't seen the tour yet.
   useEffect(() => {
-    if (!me || me.user.onboardedAt || tourStartedRef.current) return
+    // Guard against an old backend that doesn't return `user` yet (deploy race).
+    if (!me?.user || me.user.onboardedAt || tourStartedRef.current) return
     tourStartedRef.current = true
     // Let the sidebar/header tour targets paint first.
     const t = setTimeout(() => launchTour(), 400)
