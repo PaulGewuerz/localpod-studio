@@ -59,11 +59,11 @@ export function startTour(onFinish?: () => void) {
         },
       },
       {
-        element: '[data-tour="nav-shows"]',
+        element: '[data-tour="nav-dist"]',
         popover: {
-          title: '3. Publish to your feed',
+          title: '3. Get listed on Apple, Spotify & more',
           description:
-            'Approved episodes go <b>live</b> on your show’s RSS feed and out to Apple, Spotify and more. Manage your shows and feed here.',
+            'Approved episodes go <b>live</b> on your show’s RSS feed instantly. To appear in the big apps, that feed has to be submitted to each one — submit it yourself from here, or have us do it for you.',
           side: 'right',
           align: 'start',
         },

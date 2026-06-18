@@ -968,14 +968,14 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Publish
           </div>
-          <NavItem navKey="shows"     icon="◈" label="Shows" tourId="nav-shows" />
+          <NavItem navKey="shows"     icon="◈" label="Shows" />
           <NavItem navKey="analytics" icon="◌" label="Analytics" tourId="nav-analytics" />
           {!isSolo && <NavItem navKey="ads" icon="◧" label="Ad Manager" />}
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Settings
           </div>
-          <NavItem navKey="dist"     icon="◫" label="Distribution" />
+          <NavItem navKey="dist"     icon="◫" label="Distribution" tourId="nav-dist" />
           <NavItem navKey="settings" icon="⊙" label="Settings" />
           <NavItem navKey="billing"  icon="◈" label="Billing" />
         </nav>
