@@ -46,6 +46,49 @@ body {
 .lp-wave    { animation: lp-wave  0.9s ease-in-out infinite; }
 .lp-pulse   { animation: lp-pulse 1s ease-in-out infinite; }
 
+/* New-user product tour (driver.js) — match the studio palette */
+.driver-popover.lp-tour {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 12px 32px rgba(15, 14, 13, 0.16);
+  max-width: 320px;
+}
+.driver-popover.lp-tour .driver-popover-title {
+  font-family: var(--font-nunito), sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+.driver-popover.lp-tour .driver-popover-description {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-light);
+}
+.driver-popover.lp-tour .driver-popover-progress-text {
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.driver-popover.lp-tour button.driver-popover-next-btn {
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 2px;
+  font-weight: 600;
+  text-shadow: none;
+}
+.driver-popover.lp-tour button.driver-popover-prev-btn {
+  background: var(--bg-warm);
+  color: var(--ink-light);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  text-shadow: none;
+}
+.driver-popover.lp-tour .driver-popover-close-btn {
+  color: var(--ink-faint);
+}
+
 /* Show notes rich-text editor */
 .show-notes-editor:empty:before {
   content: attr(data-placeholder);

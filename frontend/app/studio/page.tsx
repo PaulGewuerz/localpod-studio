@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { startTour } from '@/lib/tour'
 import AdsView from './AdsView'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
@@ -45,6 +46,7 @@ interface ShowData {
 }
 
 interface MeData {
+  user: { id: string; email: string; name: string | null; onboardedAt: string | null }
   org: { id: string; name: string; defaultVoice: Voice | null }
   shows: ShowData[]
   subscription: { stripeCustomerId: string | null; status: string; plan: string | null; trialEndsAt: string | null; cancelAtPeriodEnd?: boolean; cancelAt?: string | null } | null
@@ -449,6 +451,9 @@ function StudioInner() {
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null)
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
 
+  // New-user product tour
+  const tourStartedRef = useRef(false)
+
 const showNotesRef = useRef<HTMLDivElement>(null)
   const audioFileRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -552,6 +557,36 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     }
     load()
   }, [episodeRefreshKey, activeShowId])
+
+  // ── New-user product tour ─────────────────────────────────────────────────────
+
+  async function markOnboarded() {
+    // Optimistically flip local state so the tour never re-triggers this session.
+    setMe(prev => prev && !prev.user.onboardedAt
+      ? { ...prev, user: { ...prev.user, onboardedAt: new Date().toISOString() } }
+      : prev)
+    try {
+      const token = await getToken()
+      await fetch(`${API_URL}/me/onboarded`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch { /* best-effort: tour state is non-critical */ }
+  }
+
+  function launchTour() {
+    startTour(() => markOnboarded())
+  }
+
+  // Auto-launch once for users who haven't seen the tour yet.
+  useEffect(() => {
+    if (!me || me.user.onboardedAt || tourStartedRef.current) return
+    tourStartedRef.current = true
+    // Let the sidebar/header tour targets paint first.
+    const t = setTimeout(() => launchTour(), 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me])
 
   // ── Sync settings form from me when tab opens ────────────────────────────────
 
@@ -860,10 +895,11 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
   // ── Sidebar nav item ──────────────────────────────────────────────────────────
 
-  function NavItem({ navKey, icon, label, badge }: { navKey: NavKey; icon: string; label: string; badge?: number }) {
+  function NavItem({ navKey, icon, label, badge, tourId }: { navKey: NavKey; icon: string; label: string; badge?: number; tourId?: string }) {
     const active = activeNav === navKey
     return (
       <button
+        data-tour={tourId}
         onClick={() => { setActiveNav(navKey); if (navKey === 'new') resetNewEpisode(); setMobileNavOpen(false) }}
         className={`w-full flex items-center gap-2.5 px-6 py-2.5 text-[13px] text-left transition-all border-l-2 ${
           active
@@ -925,14 +961,14 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         {/* Nav */}
         <nav className="flex flex-col gap-0.5">
           <NavItem navKey="dashboard" icon="▦" label="Dashboard" />
-          <NavItem navKey="episodes"  icon="◎" label="Episodes" badge={episodes.filter(e => e.status === 'draft').length} />
-          <NavItem navKey="new"       icon="＋" label="New Episode" />
+          <NavItem navKey="episodes"  icon="◎" label="Episodes" badge={episodes.filter(e => e.status === 'draft').length} tourId="nav-episodes" />
+          <NavItem navKey="new"       icon="＋" label="New Episode" tourId="nav-new" />
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Publish
           </div>
-          <NavItem navKey="shows"     icon="◈" label="Shows" />
-          <NavItem navKey="analytics" icon="◌" label="Analytics" />
+          <NavItem navKey="shows"     icon="◈" label="Shows" tourId="nav-shows" />
+          <NavItem navKey="analytics" icon="◌" label="Analytics" tourId="nav-analytics" />
           {!isSolo && <NavItem navKey="ads" icon="◧" label="Ad Manager" />}
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
@@ -997,6 +1033,15 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               <span className="w-2 h-2 rounded-full bg-[var(--green)] inline-block" />
               All systems operational
             </span>
+            <button
+              data-tour="help"
+              onClick={launchTour}
+              aria-label="Take a tour"
+              title="Take a tour"
+              className="w-8 h-8 rounded-full bg-[var(--bg-warm)] border border-[var(--rule)] flex items-center justify-center text-[13px] font-semibold text-[var(--ink-light)] hover:text-[var(--ink)] hover:border-[var(--ink-faint)] transition-colors"
+            >
+              ?
+            </button>
             <div className="w-8 h-8 rounded-full bg-[var(--bg-warm)] border border-[var(--rule)] flex items-center justify-center text-[12px] font-semibold text-[var(--ink-light)] cursor-default select-none">
               {orgInitials}
             </div>

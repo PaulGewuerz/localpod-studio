@@ -34,6 +34,12 @@ router.get('/', async (req, res) => {
   }
 
   res.json({
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      name: req.user.name,
+      onboardedAt: req.user.onboardedAt,
+    },
     org: {
       id: org.id,
       name: org.name,
@@ -42,6 +48,16 @@ router.get('/', async (req, res) => {
     shows: org.shows,
     subscription,
   });
+});
+
+// POST /me/onboarded — mark the product tour as completed (or skipped) for the
+// current user so it doesn't replay on future visits. Idempotent.
+router.post('/onboarded', async (req, res) => {
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { onboardedAt: req.user.onboardedAt ?? new Date() },
+  });
+  res.json({ onboardedAt: user.onboardedAt });
 });
 
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
