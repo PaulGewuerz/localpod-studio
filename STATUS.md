@@ -30,8 +30,15 @@ Done:
 - [x] Migration applied to Supabase via `scripts/apply-automation-migration.js`
 - [x] Validated: schema queryable + feed parse + extraction (no TTS spent in testing)
 
+**v2 shipped (`ac8945b`, 2026-06-19): scheduled digest + ad placement + junk-text cleanup.**
+- Per-show schedule: "generate an episode every N days (1–8), starting <datetime>". Poller now fires per-show on its own interval (not per-article) via `automationNextRunAt`.
+- Each run combines all new feed articles since the last run into one **digest** draft (`generateDigestEpisode`).
+- Per-show ad selection (pre/mid/post) from active campaigns in Settings → auto-assigned on drafts; mid-rolls placed at article boundaries, movable in review.
+- Junk-text cleanup (`utils/cleanArticleText.js`): strips bylines, captions/credits, share/newsletter/"read more" boilerplate before narration.
+- Schema: `Show.automationIntervalDays/StartAt/NextRunAt/LastRunAt/AdSelections`; migration `20260619000000` applied to Supabase.
+
 Still open:
-- [ ] **End-to-end live test** — enable automation on a real show with a real feed, confirm a draft actually gets created (will spend ElevenLabs credits)
+- [ ] **End-to-end live test** — enable automation on a real show with a real feed, confirm a digest draft actually gets created (will spend ElevenLabs credits)
 - [ ] **Failure visibility** — `IngestedArticle.status` is `failed`/`skipped` with an `error`, but there's no UI/notification surfacing it yet
 - [ ] Auto-publish path to Megaphone for shows set to full-auto (v2)
 - [ ] Per-article notification email on success/failure (v2)
@@ -49,6 +56,7 @@ Still open:
 
 ## Done (recent, newest first)
 
+- Automatic episode flow v2: scheduled digest, per-show ad placement, junk-text cleanup (`ac8945b`)
 - Automatic episode flow v1: RSS feed → draft episodes (`bb8a89b`)
 - Stripe cancellation emails (customer + admin) on cancel-at-period-end (`146caaf` — see Other open items re: commit message)
 - Free trial moved into Stripe: card up front, auto-charge at day 7, reminder email (`b8f1882`)
