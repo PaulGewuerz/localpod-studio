@@ -1,15 +1,15 @@
 const Parser = require('rss-parser');
 const prisma = require('../prisma');
-const { generateDraftEpisode } = require('../services/generateEpisode');
+const { generateDigestEpisode } = require('../services/generateEpisode');
 const { htmlToText } = require('../utils/htmlToText');
 
 const parser = new Parser({ timeout: 20_000 });
 
 const POLL_INTERVAL_MS = 15 * 60 * 1000;
 const INITIAL_DELAY_MS = 30_000;
-const MAX_GENERATED_PER_SHOW_PER_POLL = 5; // safety cap on TTS spend per cycle
-const MAX_ARTICLE_AGE_MS = 48 * 60 * 60 * 1000; // never generate backlog older than 48h
-const MIN_ARTICLE_CHARS = 400; // below this, feed content is a teaser — fetch the page instead
+const MAX_ARTICLES_PER_DIGEST = 10;   // safety cap on TTS spend per digest
+const FIRST_RUN_MAX_AGE_MS = 48 * 60 * 60 * 1000; // first run never reaches back further than this
+const MIN_ARTICLE_CHARS = 400;        // below this, feed content is a teaser — fetch the page instead
 
 /**
  * Get article text for a feed item: prefer full content embedded in the feed,
@@ -40,74 +40,145 @@ async function extractArticleText(item) {
   return fromFeed;
 }
 
-async function pollShow(show) {
+function itemPubDate(item) {
+  const d = item.isoDate ? new Date(item.isoDate)
+    : item.pubDate ? new Date(item.pubDate) : null;
+  return d && !isNaN(d) ? d : null;
+}
+
+/** Advance a run clock by intervalDays until it is in the future. */
+function advanceRunClock(from, intervalDays, now) {
+  const next = new Date(from.getTime());
+  const stepMs = intervalDays * 24 * 60 * 60 * 1000;
+  do { next.setTime(next.getTime() + stepMs); } while (next.getTime() <= now.getTime());
+  return next;
+}
+
+/**
+ * Process one due show: collect everything new in its feed since the last run,
+ * combine into a single digest draft episode, then advance the run clock.
+ */
+async function runShowDigest(show, now) {
+  const since = show.automationLastRunAt
+    ?? new Date(Math.max(
+      (show.automationStartAt ?? show.automationNextRunAt ?? now).getTime(),
+      now.getTime() - FIRST_RUN_MAX_AGE_MS,
+    ));
+
   const feed = await parser.parseURL(show.feedUrl);
-  const items = (feed.items || []).slice(0, 20); // newest items only
-  let generated = 0;
+  const items = (feed.items || []).slice(0, 30);
 
+  // Claim new items (newest first), keeping those published since the last run.
+  const claimed = [];
   for (const item of items) {
-    if (generated >= MAX_GENERATED_PER_SHOW_PER_POLL) break;
-
     const guid = item.guid || item.link;
     if (!guid) continue;
 
-    // Claim the item via the (showId, guid) unique constraint — if the row
-    // already exists this item was handled (or is being handled) before.
     let record;
     try {
       record = await prisma.ingestedArticle.create({
         data: { showId: show.id, guid, url: item.link || null, title: item.title || null },
       });
     } catch {
-      continue;
+      continue; // already seen in a prior run
     }
 
-    const pubDate = item.isoDate ? new Date(item.isoDate)
-      : item.pubDate ? new Date(item.pubDate) : null;
-    if (pubDate && !isNaN(pubDate) && Date.now() - pubDate.getTime() > MAX_ARTICLE_AGE_MS) {
+    const pub = itemPubDate(item);
+    if (pub && pub.getTime() < since.getTime()) {
       await prisma.ingestedArticle.update({
         where: { id: record.id },
-        data: { status: 'skipped', error: 'older than 48h at first poll' },
+        data: { status: 'skipped', error: 'published before this run window' },
       });
       continue;
     }
-
-    try {
-      const text = await extractArticleText(item);
-      if (text.length < MIN_ARTICLE_CHARS) {
-        throw new Error(`article text too short (${text.length} chars)`);
-      }
-
-      const voiceDbId = show.automationVoiceId || show.organization.defaultVoiceId;
-      if (!voiceDbId) throw new Error('no voice configured — set a show automation voice or org default voice');
-      const voice = await prisma.voice.findUnique({ where: { id: voiceDbId } });
-      if (!voice) throw new Error('configured voice not found');
-
-      const episode = await generateDraftEpisode({
-        org: show.organization,
-        show,
-        voiceElevenLabsId: voice.elevenLabsId,
-        articleText: text,
-        title: item.title || 'Untitled Episode',
-        description: htmlToText(item.contentSnippet || item.summary || '').slice(0, 500) || null,
-      });
-
-      await prisma.ingestedArticle.update({
-        where: { id: record.id },
-        data: { status: 'generated', episodeId: episode.id },
-      });
-      generated++;
-      console.log(`[feed-poller] draft created: "${episode.title}" (show: ${show.name})`);
-    } catch (err) {
-      console.error(`[feed-poller] failed on "${item.title}" (show: ${show.name}):`, err.message);
-      await prisma.ingestedArticle.update({
-        where: { id: record.id },
-        data: { status: 'failed', error: String(err.message).slice(0, 500) },
-      }).catch(() => {});
-      // Org is out of characters — no point trying further items this cycle
-      if (err.code === 'character_limit_exceeded') break;
-    }
+    claimed.push({ item, record });
   }
+
+  const advanceClock = async (lastRun) => {
+    const base = show.automationNextRunAt ?? show.automationStartAt ?? lastRun;
+    const nextRunAt = advanceRunClock(base, show.automationIntervalDays, now);
+    await prisma.show.update({
+      where: { id: show.id },
+      data: { automationLastRunAt: lastRun, automationNextRunAt: nextRunAt },
+    });
+  };
+
+  if (!claimed.length) {
+    console.log(`[feed-poller] ${show.name}: nothing new this run`);
+    await advanceClock(now);
+    return;
+  }
+
+  // Build digest segments (cap spend), extracting + length-checking each article.
+  const segments = [];
+  const usedRecordIds = [];
+  for (const { item, record } of claimed) {
+    if (segments.length >= MAX_ARTICLES_PER_DIGEST) {
+      await prisma.ingestedArticle.update({
+        where: { id: record.id }, data: { status: 'skipped', error: 'over per-digest article cap' },
+      });
+      continue;
+    }
+    const text = await extractArticleText(item);
+    if (text.length < MIN_ARTICLE_CHARS) {
+      await prisma.ingestedArticle.update({
+        where: { id: record.id },
+        data: { status: 'skipped', error: `article text too short (${text.length} chars)` },
+      });
+      continue;
+    }
+    segments.push({ title: item.title || 'Untitled', text });
+    usedRecordIds.push(record.id);
+  }
+
+  if (!segments.length) {
+    console.log(`[feed-poller] ${show.name}: new items but no usable article text`);
+    await advanceClock(now);
+    return;
+  }
+
+  const voiceDbId = show.automationVoiceId || show.organization.defaultVoiceId;
+  const voice = voiceDbId ? await prisma.voice.findUnique({ where: { id: voiceDbId } }) : null;
+  if (!voice) {
+    console.error(`[feed-poller] ${show.name}: no voice configured — skipping run`);
+    await prisma.ingestedArticle.updateMany({
+      where: { id: { in: usedRecordIds } },
+      data: { status: 'failed', error: 'no voice configured for automation' },
+    });
+    await advanceClock(now);
+    return;
+  }
+
+  const digestTitle = segments.length === 1
+    ? segments[0].title
+    : `${show.name} digest — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const description = segments.length === 1
+    ? (htmlToText(claimed[0].item.contentSnippet || claimed[0].item.summary || '').slice(0, 500) || null)
+    : `Featuring: ${segments.map(s => s.title).join(' • ')}`.slice(0, 500);
+
+  try {
+    const episode = await generateDigestEpisode({
+      org: show.organization,
+      show,
+      voiceElevenLabsId: voice.elevenLabsId,
+      segments,
+      title: digestTitle,
+      description,
+    });
+    await prisma.ingestedArticle.updateMany({
+      where: { id: { in: usedRecordIds } },
+      data: { status: 'generated', episodeId: episode.id },
+    });
+    console.log(`[feed-poller] digest draft created: "${episode.title}" (${segments.length} article(s), show: ${show.name})`);
+  } catch (err) {
+    console.error(`[feed-poller] digest failed (show: ${show.name}):`, err.message);
+    await prisma.ingestedArticle.updateMany({
+      where: { id: { in: usedRecordIds } },
+      data: { status: 'failed', error: String(err.message).slice(0, 500) },
+    });
+  }
+
+  await advanceClock(now);
 }
 
 let polling = false;
@@ -115,16 +186,42 @@ let polling = false;
 async function pollAllFeeds() {
   if (polling) return;
   polling = true;
+  const now = new Date();
   try {
     const shows = await prisma.show.findMany({
-      where: { automationEnabled: true, feedUrl: { not: null } },
+      where: {
+        automationEnabled: true,
+        feedUrl: { not: null },
+        automationIntervalDays: { not: null },
+      },
       include: { organization: { include: { subscription: true } } },
     });
+
     for (const show of shows) {
+      // Initialize the run clock from the configured start, if unset.
+      let nextRunAt = show.automationNextRunAt;
+      if (!nextRunAt) {
+        if (!show.automationStartAt) continue; // not fully configured yet
+        nextRunAt = show.automationStartAt;
+        await prisma.show.update({
+          where: { id: show.id }, data: { automationNextRunAt: nextRunAt },
+        });
+        show.automationNextRunAt = nextRunAt;
+      }
+
+      if (nextRunAt.getTime() > now.getTime()) continue; // not due yet
+
       try {
-        await pollShow(show);
+        await runShowDigest(show, now);
       } catch (err) {
         console.error(`[feed-poller] feed error for show ${show.id} (${show.feedUrl}):`, err.message);
+        // Don't let a feed-parse failure wedge the clock — push it to the next interval.
+        try {
+          await prisma.show.update({
+            where: { id: show.id },
+            data: { automationNextRunAt: advanceRunClock(nextRunAt, show.automationIntervalDays, now) },
+          });
+        } catch { /* ignore */ }
       }
     }
   } catch (err) {

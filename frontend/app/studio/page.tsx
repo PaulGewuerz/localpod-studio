@@ -43,6 +43,23 @@ interface ShowData {
   feedUrl: string | null
   automationEnabled: boolean
   automationVoiceId: string | null
+  automationIntervalDays: number | null
+  automationStartAt: string | null
+  automationAdSelections: AutomationAdSelections | null
+}
+
+interface AutomationAdSelections {
+  preRollCampaignId: string | null
+  postRollCampaignId: string | null
+  midRollCampaignIds: string[]
+}
+
+interface AdCampaignLite {
+  id: string
+  name: string
+  type: string
+  status: string
+  audioUrl: string | null
 }
 
 interface MeData {
@@ -71,6 +88,21 @@ async function getToken(): Promise<string> {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// <input type="datetime-local"> works in local time with a "YYYY-MM-DDTHH:mm" value.
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function localInputToIso(local: string): string | null {
+  if (!local) return null
+  const d = new Date(local)
+  return isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 function EmbedCopyButton({ code }: { code: string }) {
@@ -444,6 +476,12 @@ function StudioInner() {
   const [settingsFeedUrl, setSettingsFeedUrl] = useState('')
   const [settingsAutomationEnabled, setSettingsAutomationEnabled] = useState(false)
   const [settingsAutomationVoiceId, setSettingsAutomationVoiceId] = useState('')
+  const [settingsIntervalDays, setSettingsIntervalDays] = useState(1)
+  const [settingsStartAt, setSettingsStartAt] = useState('')
+  const [settingsPreRollId, setSettingsPreRollId] = useState('')
+  const [settingsPostRollId, setSettingsPostRollId] = useState('')
+  const [settingsMidRollIds, setSettingsMidRollIds] = useState<string[]>([])
+  const [adCampaigns, setAdCampaigns] = useState<AdCampaignLite[]>([])
   const settingsCoverRef = useRef<HTMLInputElement>(null)
   const settingsDescriptionRef = useRef<HTMLDivElement>(null)
 
@@ -603,10 +641,31 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       setSettingsFeedUrl(activeShow.feedUrl ?? '')
       setSettingsAutomationEnabled(activeShow.automationEnabled ?? false)
       setSettingsAutomationVoiceId(activeShow.automationVoiceId ?? '')
+      setSettingsIntervalDays(activeShow.automationIntervalDays ?? 1)
+      setSettingsStartAt(isoToLocalInput(activeShow.automationStartAt))
+      setSettingsPreRollId(activeShow.automationAdSelections?.preRollCampaignId ?? '')
+      setSettingsPostRollId(activeShow.automationAdSelections?.postRollCampaignId ?? '')
+      setSettingsMidRollIds(activeShow.automationAdSelections?.midRollCampaignIds ?? [])
       setSettingsError(null)
       setSettingsSaved(false)
     }
   }, [activeNav, me, activeShowId])
+
+  // Load active ad campaigns (with audio) for the automation ad selectors.
+  useEffect(() => {
+    if (activeNav !== 'settings') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch(`${API_URL}/ad-campaigns`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) return
+        const all: AdCampaignLite[] = await res.json()
+        if (!cancelled) setAdCampaigns(all.filter(c => c.status === 'active' && c.audioUrl))
+      } catch { /* non-fatal */ }
+    })()
+    return () => { cancelled = true }
+  }, [activeNav])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -796,6 +855,13 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           feedUrl: settingsFeedUrl.trim(),
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
+          automationIntervalDays: settingsIntervalDays,
+          automationStartAt: localInputToIso(settingsStartAt),
+          automationAdSelections: {
+            preRollCampaignId: settingsPreRollId || null,
+            postRollCampaignId: settingsPostRollId || null,
+            midRollCampaignIds: settingsMidRollIds,
+          },
         }),
       })
       if (!patchRes.ok) {
@@ -816,6 +882,13 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           feedUrl: settingsFeedUrl.trim() || null,
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
+          automationIntervalDays: settingsIntervalDays,
+          automationStartAt: localInputToIso(settingsStartAt),
+          automationAdSelections: {
+            preRollCampaignId: settingsPreRollId || null,
+            postRollCampaignId: settingsPostRollId || null,
+            midRollCampaignIds: settingsMidRollIds,
+          },
         } : s),
       } : prev)
 
@@ -1749,9 +1822,124 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   </select>
                 </div>
 
+                {/* Schedule */}
+                <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-4">
+                  <div>
+                    <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                      Generate an episode every
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={settingsIntervalDays}
+                        onChange={e => {
+                          const n = parseInt(e.target.value, 10)
+                          setSettingsIntervalDays(Number.isFinite(n) ? Math.min(8, Math.max(1, n)) : 1)
+                        }}
+                        className="w-20 border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)]"
+                      />
+                      <span className="text-[14px] text-[var(--ink-light)]">{settingsIntervalDays === 1 ? 'day' : 'days'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                      Starting
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={settingsStartAt}
+                      onChange={e => setSettingsStartAt(e.target.value)}
+                      className="border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Ads for auto episodes */}
+                <div className="mt-6 pt-5 border-t border-[var(--rule)]">
+                  <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1">
+                    Ads for Auto Episodes
+                  </label>
+                  <p className="text-[13px] text-[var(--ink-light)] leading-relaxed max-w-[460px] mb-4">
+                    Pick campaigns to place on every auto episode. Mid-roll spots are positioned automatically between articles — you can move them when you review each draft.
+                  </p>
+
+                  {adCampaigns.length === 0 ? (
+                    <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                      No active campaigns with audio yet.{' '}
+                      <button type="button" onClick={() => setActiveNav('ads')} className="underline hover:text-[var(--ink)]">Create one in Ad Manager →</button>
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                          Pre-roll
+                        </label>
+                        <select
+                          value={settingsPreRollId}
+                          onChange={e => setSettingsPreRollId(e.target.value)}
+                          className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] bg-white"
+                        >
+                          <option value="">None</option>
+                          {adCampaigns.filter(c => c.type === 'pre-roll').map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                          Mid-roll{settingsMidRollIds.length > 1 ? ` (${settingsMidRollIds.length} spots)` : ''}
+                        </label>
+                        {adCampaigns.filter(c => c.type === 'mid-roll').length === 0 ? (
+                          <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">No mid-roll campaigns.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {adCampaigns.filter(c => c.type === 'mid-roll').map(c => (
+                              <label key={c.id} className="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={settingsMidRollIds.includes(c.id)}
+                                  onChange={() => setSettingsMidRollIds(prev =>
+                                    prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                                  )}
+                                  className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
+                                />
+                                <span className="text-[14px] text-[var(--ink)]">{c.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
+                          Post-roll
+                        </label>
+                        <select
+                          value={settingsPostRollId}
+                          onChange={e => setSettingsPostRollId(e.target.value)}
+                          className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] bg-white"
+                        >
+                          <option value="">None</option>
+                          {adCampaigns.filter(c => c.type === 'post-roll').map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {settingsAutomationEnabled && !settingsFeedUrl.trim() && (
                   <p className="mt-4 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">
                     Add a feed URL above for automation to run.
+                  </p>
+                )}
+                {settingsAutomationEnabled && settingsFeedUrl.trim() && !settingsStartAt && (
+                  <p className="mt-4 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">
+                    Set a start date/time for automation to run.
                   </p>
                 )}
               </div>

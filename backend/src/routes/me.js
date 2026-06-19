@@ -5,6 +5,21 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
 
+// Normalize the automation ad-selection blob to a known shape (or null).
+function sanitizeAdSelections(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {
+    preRollCampaignId: raw.preRollCampaignId || null,
+    postRollCampaignId: raw.postRollCampaignId || null,
+    midRollCampaignIds: Array.isArray(raw.midRollCampaignIds)
+      ? raw.midRollCampaignIds.filter(id => typeof id === 'string') : [],
+  };
+  if (!out.preRollCampaignId && !out.postRollCampaignId && out.midRollCampaignIds.length === 0) {
+    return null;
+  }
+  return out;
+}
+
 // GET /me — current publisher's org, shows, subscription, voice
 router.get('/', async (req, res) => {
   const org = await prisma.organization.findUnique({
@@ -62,7 +77,7 @@ router.post('/onboarded', async (req, res) => {
 
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
 router.patch('/', async (req, res) => {
-  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults, feedUrl, automationEnabled, automationVoiceId } = req.body;
+  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults, feedUrl, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections } = req.body;
   const orgId = req.user.organization.id;
 
   // Normalize: accept either `categories` (array) or legacy `category` (string)
@@ -72,7 +87,9 @@ router.patch('/', async (req, res) => {
 
   const updates = [];
 
-  if (showName !== undefined || author !== undefined || description !== undefined || categoryValue !== undefined || coverArtUrl !== undefined || adMarkerDefaults !== undefined || feedUrl !== undefined || automationEnabled !== undefined || automationVoiceId !== undefined) {
+  const showFields = [showName, author, description, categoryValue, coverArtUrl, adMarkerDefaults,
+    feedUrl, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections];
+  if (showFields.some(v => v !== undefined)) {
     const show = showId
       ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
       : await prisma.show.findFirst({ where: { organizationId: orgId } });
@@ -87,6 +104,19 @@ router.patch('/', async (req, res) => {
       if (feedUrl !== undefined)           data.feedUrl = feedUrl || null;
       if (automationEnabled !== undefined) data.automationEnabled = Boolean(automationEnabled);
       if (automationVoiceId !== undefined) data.automationVoiceId = automationVoiceId || null;
+      if (automationIntervalDays !== undefined) {
+        const n = parseInt(automationIntervalDays, 10);
+        data.automationIntervalDays = Number.isFinite(n) ? Math.min(8, Math.max(1, n)) : null;
+      }
+      if (automationStartAt !== undefined) {
+        const start = automationStartAt ? new Date(automationStartAt) : null;
+        data.automationStartAt = start && !isNaN(start) ? start : null;
+        // Re-sync the run clock to the (new) start so schedule edits take effect.
+        data.automationNextRunAt = data.automationStartAt;
+      }
+      if (automationAdSelections !== undefined) {
+        data.automationAdSelections = sanitizeAdSelections(automationAdSelections);
+      }
       await prisma.show.update({ where: { id: show.id }, data });
     }
     updates.push('show');

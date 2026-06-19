@@ -44,6 +44,11 @@ model Show {
   feedUrl             String?      // source RSS feed for automatic episode generation
   automationEnabled   Boolean      @default(false)
   automationVoiceId   String?
+  automationIntervalDays Int?      // generate a digest episode every N days (1–8)
+  automationStartAt   DateTime?    // first scheduled run
+  automationNextRunAt DateTime?    // poller's "is this show due?" clock
+  automationLastRunAt DateTime?    // last time a digest run fired
+  automationAdSelections Json?     // { preRollCampaignId, postRollCampaignId, midRollCampaignIds: [] }
   createdAt           DateTime     @default(now())
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])
