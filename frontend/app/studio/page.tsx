@@ -42,6 +42,7 @@ interface ShowData {
   megaphoneRssUrl: string | null
   feedUrl: string | null
   sourceType: string | null
+  sourceConfig: { linkSelector?: string | null } | null
   automationEnabled: boolean
   automationVoiceId: string | null
   automationIntervalDays: number | null
@@ -477,6 +478,7 @@ function StudioInner() {
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [settingsFeedUrl, setSettingsFeedUrl] = useState('')
   const [settingsSourceType, setSettingsSourceType] = useState<string | null>(null)
+  const [settingsLinkSelector, setSettingsLinkSelector] = useState('')
   const [testingSource, setTestingSource] = useState(false)
   const [sourceTestResult, setSourceTestResult] = useState<{ ok: boolean; sourceType?: string; resolvedUrl?: string; itemCount?: number; sampleTitles?: string[]; error?: string } | null>(null)
   const [settingsAutomationEnabled, setSettingsAutomationEnabled] = useState(false)
@@ -645,6 +647,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       setSettingsCoverFile(null)
       setSettingsFeedUrl(activeShow.feedUrl ?? '')
       setSettingsSourceType(activeShow.sourceType ?? null)
+      setSettingsLinkSelector(activeShow.sourceConfig?.linkSelector ?? '')
       setSourceTestResult(null)
       setSettingsAutomationEnabled(activeShow.automationEnabled ?? false)
       setSettingsAutomationVoiceId(activeShow.automationVoiceId ?? '')
@@ -892,7 +895,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       const res = await fetch(`${API_URL}/me/test-source`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ url: settingsFeedUrl.trim() }),
+        body: JSON.stringify({
+          url: settingsFeedUrl.trim(),
+          selector: settingsLinkSelector.trim() || undefined,
+        }),
       })
       const result = await res.json()
       setSourceTestResult(result)
@@ -940,6 +946,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           ...(coverArtUrl ? { coverArtUrl } : {}),
           feedUrl: settingsFeedUrl.trim(),
           sourceType: settingsSourceType,
+          sourceConfig: settingsLinkSelector.trim() ? { linkSelector: settingsLinkSelector.trim() } : null,
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
           automationIntervalDays: settingsIntervalDays,
@@ -968,6 +975,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           ...(cacheBustedUrl ? { coverArtUrl: cacheBustedUrl } : {}),
           feedUrl: settingsFeedUrl.trim() || null,
           sourceType: settingsSourceType,
+          sourceConfig: settingsLinkSelector.trim() ? { linkSelector: settingsLinkSelector.trim() } : null,
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
           automationIntervalDays: settingsIntervalDays,
@@ -1972,7 +1980,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     sourceTestResult.ok ? (
                       <div className="mt-3 rounded-[4px] border border-[var(--green)]/40 bg-[var(--green)]/5 px-3 py-2.5">
                         <p className="text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--green)]">
-                          ✓ Found {sourceTestResult.sourceType === 'sitemap' ? 'sitemap' : `${sourceTestResult.sourceType?.toUpperCase()} feed`}{typeof sourceTestResult.itemCount === 'number' ? ` · ${sourceTestResult.itemCount} items` : ''}
+                          ✓ {sourceTestResult.sourceType === 'sitemap' ? 'Found sitemap'
+                            : sourceTestResult.sourceType === 'scrape' ? 'Reading article links from page'
+                            : `Found ${sourceTestResult.sourceType?.toUpperCase()} feed`}{typeof sourceTestResult.itemCount === 'number' ? ` · ${sourceTestResult.itemCount} items` : ''}
                         </p>
                         {sourceTestResult.resolvedUrl && sourceTestResult.resolvedUrl !== settingsFeedUrl && (
                           <p className="mt-1 text-[11px] text-[var(--ink-faint)] break-all">Using: {sourceTestResult.resolvedUrl}</p>
@@ -1990,6 +2000,25 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                         <p className="text-[12px] text-[var(--accent)] leading-relaxed">{sourceTestResult.error}</p>
                       </div>
                     )
+                  )}
+
+                  {/* Advanced: link selector for scraped sources */}
+                  {settingsSourceType === 'scrape' && (
+                    <div className="mt-3">
+                      <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">
+                        Advanced · Article link selector
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsLinkSelector}
+                        onChange={e => { setSettingsLinkSelector(e.target.value); setSourceTestResult(null) }}
+                        placeholder="e.g. h2.headline a"
+                        className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[13px] font-[family-name:var(--font-dm-mono)] text-[var(--ink)] focus:outline-none focus:border-[var(--ink-light)]"
+                      />
+                      <p className="mt-1.5 text-[12px] text-[var(--ink-faint)] leading-relaxed">
+                        This site has no feed, so we read article links from the page. If we’re grabbing the wrong links, enter a CSS selector for the headline links and hit Test source.
+                      </p>
+                    </div>
                   )}
                 </div>
 

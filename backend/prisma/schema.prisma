@@ -43,6 +43,7 @@ model Show {
   megaphoneRssUrl     String?
   feedUrl             String?      // resolved source URL the poller hits (feed/sitemap/homepage)
   sourceType          String?      // how to discover articles: rss | sitemap | scrape (null = rss)
+  sourceConfig        Json?        // per-source options, e.g. { linkSelector } for scrape
   automationEnabled   Boolean      @default(false)
   automationVoiceId   String?
   automationIntervalDays Int?      // generate a digest episode every N days (1–8)

@@ -171,6 +171,84 @@ async function discoverSitemap(origin, inputUrl, maybeSitemapXml) {
   return null;
 }
 
+// ── Homepage scraping ───────────────────────────────────────────────────────
+
+// Path segments that signal a non-article (nav/utility) link.
+const NON_ARTICLE_RE = /\/(tag|tags|category|categories|topic|topics|section|sections|author|authors|about|contact|privacy|terms|subscribe|signin|sign-in|login|register|account|search|feed|rss|cart|shop|advertise|advertising|newsletter|jobs|careers|events|page|wp-admin)(\/|$|\?)/i;
+const NON_ARTICLE_EXT_RE = /\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|mp3|mp4|xml|json|css|js)$/i;
+
+function isArticleLikePath(path) {
+  if (path === '/' || path === '') return false;
+  if (NON_ARTICLE_RE.test(path)) return false;
+  if (NON_ARTICLE_EXT_RE.test(path)) return false;
+  const segs = path.split('/').filter(Boolean);
+  const last = segs[segs.length - 1] || '';
+  const slugWords = last.split('-').filter(Boolean).length;
+  const hasDate = /\/(19|20)\d\d\//.test(path);
+  return hasDate || slugWords >= 3 || (segs.length >= 2 && slugWords >= 2);
+}
+
+function scoreLink(path, text) {
+  let s = 0;
+  if (/\/(19|20)\d\d\//.test(path)) s += 3;                       // dated URL
+  const last = path.split('/').filter(Boolean).pop() || '';
+  s += Math.min(4, last.split('-').filter(Boolean).length);      // slug words
+  s += Math.min(3, Math.floor(text.length / 30));                // headline length
+  return s;
+}
+
+/**
+ * Extract candidate article links from a page's HTML. With a CSS selector, takes
+ * the anchor at/within/around each matched element (escape hatch for messy
+ * sites). Without one, falls back to heuristics over same-site <a> tags
+ * (article-like path + headline-length link text). Returns normalized items.
+ */
+function scrapeArticleLinks(html, baseUrl, { selector, max = 25 } = {}) {
+  const { JSDOM } = require('jsdom');
+  const doc = new JSDOM(html, { url: baseUrl }).window.document;
+  const origin = new URL(baseUrl).origin;
+
+  let anchors;
+  if (selector) {
+    anchors = [];
+    for (const el of doc.querySelectorAll(selector)) {
+      const a = el.tagName === 'A' ? el : (el.querySelector('a') || el.closest('a'));
+      if (a) anchors.push(a);
+    }
+  } else {
+    anchors = [...doc.querySelectorAll('a[href]')];
+  }
+
+  const seen = new Set();
+  const candidates = [];
+  for (const a of anchors) {
+    const href = a.getAttribute('href');
+    if (!href) continue;
+    let abs;
+    try { abs = new URL(href, baseUrl); } catch { continue; }
+    if (abs.origin !== origin || !/^https?:$/.test(abs.protocol)) continue;
+
+    const path = abs.pathname;
+    const clean = abs.origin + path.replace(/\/$/, '');
+    if (seen.has(clean)) continue;
+
+    const text = (a.textContent || '').replace(/\s+/g, ' ').trim();
+    if (selector) {
+      if (path === '/' || path === '') continue;
+    } else {
+      if (!isArticleLikePath(path) || text.length < 25) continue;
+    }
+
+    seen.add(clean);
+    candidates.push({ url: clean, title: text || null, score: scoreLink(path, text) });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, max).map(c => ({
+    guid: c.url, url: c.url, title: c.title, publishedAt: null, raw: {},
+  }));
+}
+
 function buildResult(sourceType, resolvedUrl, feed) {
   return {
     ok: true,
@@ -231,9 +309,50 @@ async function detectSource(inputUrl) {
     };
   }
 
+  // 5) Last resort: scrape article links from the page itself.
+  try {
+    const links = scrapeArticleLinks(html, url, { max: 10 });
+    if (links.length >= 3) {
+      return {
+        ok: true,
+        sourceType: 'scrape',
+        resolvedUrl: url,
+        sampleTitles: links.slice(0, 5).map(i => i.title || slugTitleFromUrl(i.url)),
+      };
+    }
+  } catch { /* scrape failed */ }
+
   return {
     ok: false,
-    error: 'No RSS feed or sitemap found at this URL. Homepage-scraping sources are coming soon.',
+    error: 'Couldn’t find articles at this URL — no feed, sitemap, or recognizable article links. Try a section page (e.g. /news), or set a link selector under Advanced.',
+  };
+}
+
+/**
+ * Preview a scrape selector against a page (powers the Settings Test button when
+ * a custom link selector is set). Returns the same shape as detectSource.
+ */
+async function previewScrape(inputUrl, selector) {
+  let url = String(inputUrl || '').trim();
+  if (!url) return { ok: false, error: 'Enter a URL first.' };
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  let html;
+  try { html = await fetchText(url); }
+  catch (e) { return { ok: false, error: `Couldn’t fetch that URL (${e.message}).` }; }
+
+  let items;
+  try { items = scrapeArticleLinks(html, url, { selector: selector || null, max: 10 }); }
+  catch { return { ok: false, error: 'That selector isn’t valid.' }; }
+
+  if (!items.length) {
+    return { ok: false, error: 'No article links matched. Try a different selector or section page.' };
+  }
+  return {
+    ok: true,
+    sourceType: 'scrape',
+    resolvedUrl: url,
+    sampleTitles: items.slice(0, 5).map(i => i.title || slugTitleFromUrl(i.url)),
   };
 }
 
@@ -250,7 +369,12 @@ async function discoverArticles(show) {
   if (type === 'sitemap') {
     return fetchSitemapItems(show.feedUrl, { maxUrls: 40 });
   }
+  if (type === 'scrape') {
+    const html = await fetchText(show.feedUrl);
+    const selector = show.sourceConfig?.linkSelector || null;
+    return scrapeArticleLinks(html, show.feedUrl, { selector, max: 25 });
+  }
   throw new Error(`source type "${type}" not yet supported`);
 }
 
-module.exports = { detectSource, discoverArticles };
+module.exports = { detectSource, discoverArticles, previewScrape };
