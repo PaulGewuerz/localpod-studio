@@ -1131,7 +1131,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           </div>
           <NavItem navKey="shows"     icon="◈" label="Shows" />
           <NavItem navKey="analytics" icon="◌" label="Analytics" tourId="nav-analytics" />
-          {!isSolo && <NavItem navKey="ads" icon="◧" label="Ad Manager" />}
+          <NavItem navKey="ads" icon="◧" label="Ad Manager" />
 
           <div className="px-6 pt-4 pb-1.5 text-[9px] text-white/25 uppercase tracking-[0.1em] font-[family-name:var(--font-dm-mono)]">
             Settings
@@ -1553,7 +1553,29 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
           {/* ── ADS ───────────────────────────────────────────────────── */}
           {activeNav === 'ads' && (
-            <AdsView getToken={getToken} />
+            isSolo ? (
+              <div className="max-w-lg">
+                <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Ad Manager</div>
+                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">A Publisher feature</div>
+                  <p className="text-[13px] text-[var(--ink-light)] mb-5">
+                    Create audio ads and manage campaigns to monetize your episodes. Ad Manager is included with LocalPod Publisher ($99/mo). Upgrade to start running ads.
+                  </p>
+                  <button
+                    onClick={handlePortal}
+                    disabled={portalLoading}
+                    className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                  >
+                    {portalLoading ? 'Opening…' : 'Upgrade to Publisher →'}
+                  </button>
+                  {portalError && (
+                    <p className="mt-3 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{portalError}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <AdsView getToken={getToken} />
+            )
           )}
 
           {/* ── BILLING ───────────────────────────────────────────────── */}
