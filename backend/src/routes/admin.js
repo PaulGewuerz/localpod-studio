@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../prisma');
 const { supabase, supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { provisionMegaphoneShow } = require('../services/provisionShow');
 // GET /admin/publishers — list all orgs with episode stats
 router.get('/publishers', async (req, res) => {
   const orgs = await prisma.organization.findMany({
@@ -172,7 +173,20 @@ router.post('/publishers/:orgId/shows', async (req, res) => {
   if (!org) return res.status(404).json({ error: 'Organization not found' });
 
   const show = await prisma.show.create({ data: { name: showName, organizationId: orgId } });
-  res.status(201).json({ show });
+
+  // Provision a Megaphone show so the new show has an RSS feed and can publish.
+  // (The Stripe checkout webhook only ever provisions the org's first show.)
+  let megaphoneError = null;
+  try {
+    const { megaphoneShowId, megaphoneRssUrl } = await provisionMegaphoneShow(show, { fallbackTitle: org.name });
+    show.megaphoneShowId = megaphoneShowId;
+    show.megaphoneRssUrl = megaphoneRssUrl;
+  } catch (err) {
+    console.error('Megaphone provisioning failed for new show:', err.message);
+    megaphoneError = err.message;
+  }
+
+  res.status(201).json({ show, megaphoneError });
 });
 
 // POST /admin/publishers/:orgId/users — add a user to an existing org
@@ -198,6 +212,32 @@ router.post('/publishers/:orgId/users', async (req, res) => {
     .catch(err => console.error('Invite error:', err.message));
 
   res.status(201).json({ user });
+});
+
+// POST /admin/publishers/:orgId/shows/:showId/provision — create a Megaphone show
+// for an existing show that doesn't have one yet (repairs shows added before
+// provisioning happened on creation).
+router.post('/publishers/:orgId/shows/:showId/provision', async (req, res) => {
+  const { orgId, showId } = req.params;
+
+  const show = await prisma.show.findFirst({
+    where: { id: showId, organizationId: orgId },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+  if (show.megaphoneShowId) {
+    return res.status(400).json({ error: 'Show already has a Megaphone show' });
+  }
+
+  try {
+    await provisionMegaphoneShow(show, { fallbackTitle: show.organization.name });
+  } catch (err) {
+    console.error('Megaphone provisioning failed:', err.message);
+    return res.status(502).json({ error: `Megaphone provisioning failed: ${err.message}` });
+  }
+
+  const updated = await prisma.show.findUnique({ where: { id: showId } });
+  res.json({ show: updated });
 });
 
 // POST /admin/publishers/:orgId/shows/:showId/sync — pull metadata from Megaphone into DB

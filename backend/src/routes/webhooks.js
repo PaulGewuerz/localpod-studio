@@ -4,7 +4,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
 const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, addContactToAudience } = require('../email');
 const { sendSMS } = require('../notify');
-const { getHostingAdapter } = require('../adapters/hosting');
+const { provisionMegaphoneShow } = require('../services/provisionShow');
 
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -51,34 +51,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             // Create Megaphone podcast if not already created for this show
             if (show && !show.megaphoneShowId) {
               try {
-                const adapter = getHostingAdapter();
-                const showTitle = show.name ?? user.organization.name;
-                const slug = showTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-                const coverArtUrl = show.coverArtUrl ?? null;
-                const { id: megaphoneShowId, rssUrl } = await adapter.createPodcast({
-                  title: showTitle,
-                  slug,
-                  summary: show.description,
-                  category: show.category,
-                  author: show.author || showTitle,
-                  ownerName: show.author || showTitle,
-                  ownerEmail: 'paul@localpod.co',
-                });
-                console.log('Megaphone show created:', megaphoneShowId);
-
-                if (coverArtUrl) {
-                  try {
-                    await adapter.uploadPodcastCoverArt(megaphoneShowId, coverArtUrl);
-                    console.log('Cover art uploaded to Megaphone');
-                  } catch (err) {
-                    console.error('Cover art upload failed:', err.message);
-                  }
-                }
-
-                await prisma.show.update({
-                  where: { id: show.id },
-                  data: { megaphoneShowId, megaphoneRssUrl: rssUrl },
-                });
+                await provisionMegaphoneShow(show, { fallbackTitle: user.organization.name });
               } catch (err) {
                 console.error('Megaphone show creation failed:', err.message);
               }

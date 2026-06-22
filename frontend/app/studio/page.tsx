@@ -1742,7 +1742,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <EmbedCopyButton code={activeShow.megaphoneRssUrl} />
                   </div>
                 ) : (
-                  <p className="text-[13px] text-[var(--ink-faint)]">Your RSS feed will appear here once your show is set up. Publish your first episode or reach out if it doesn't show up.</p>
+                  <p className="text-[13px] text-[var(--ink-faint)]">Your RSS feed isn't ready yet. It's set up automatically when your show is created — if it hasn't appeared, reply to your welcome email or contact us and we'll sort it out.</p>
                 )}
               </div>
 

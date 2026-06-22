@@ -76,6 +76,7 @@ export default function AdminPage() {
   const [copied, setCopied] = useState<string | null>(null)
   const [activating, setActivating] = useState<string | null>(null)
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [provisioning, setProvisioning] = useState<string | null>(null)
 
 
   useEffect(() => {
@@ -241,6 +242,24 @@ export default function AdminPage() {
       alert(err instanceof Error ? err.message : 'Sync failed')
     } finally {
       setSyncing(null)
+    }
+  }
+
+  async function handleProvisionMegaphone(orgId: string, showId: string) {
+    setProvisioning(showId)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/admin/publishers/${orgId}/shows/${showId}/provision`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
+      await loadData(token)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Provisioning failed')
+    } finally {
+      setProvisioning(null)
     }
   }
 
@@ -499,9 +518,13 @@ export default function AdminPage() {
                                 {copied === show.id ? 'Copied!' : 'RSS'}
                               </button>
                             )}
-                            {show.megaphoneShowId && (
+                            {show.megaphoneShowId ? (
                               <button onClick={() => handleSyncMegaphone(pub.id, show.id)} disabled={syncing === show.id} className="text-xs text-green-600 hover:underline disabled:opacity-50">
                                 {syncing === show.id ? '…' : 'Sync'}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleProvisionMegaphone(pub.id, show.id)} disabled={provisioning === show.id} className="text-xs text-amber-600 hover:underline disabled:opacity-50">
+                                {provisioning === show.id ? '…' : 'Create Megaphone'}
                               </button>
                             )}
                           {!edShow && (
