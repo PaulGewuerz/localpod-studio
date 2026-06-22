@@ -1,9 +1,7 @@
-const Parser = require('rss-parser');
 const prisma = require('../prisma');
 const { generateDigestEpisode } = require('../services/generateEpisode');
+const { discoverArticles } = require('./articleSource');
 const { htmlToText } = require('../utils/htmlToText');
-
-const parser = new Parser({ timeout: 20_000 });
 
 const POLL_INTERVAL_MS = 15 * 60 * 1000;
 const INITIAL_DELAY_MS = 30_000;
@@ -12,38 +10,34 @@ const FIRST_RUN_MAX_AGE_MS = 48 * 60 * 60 * 1000; // first run never reaches bac
 const MIN_ARTICLE_CHARS = 400;        // below this, feed content is a teaser — fetch the page instead
 
 /**
- * Get article text for a feed item: prefer full content embedded in the feed,
- * fall back to fetching the article page and extracting readable content.
+ * Get article text for a normalized source item: prefer full content embedded
+ * in the feed (rss only), fall back to fetching the article page and extracting
+ * readable content (the only path for link-only sources like sitemap/scrape).
  */
 async function extractArticleText(item) {
-  const fromFeed = htmlToText(item['content:encoded'] || item.content || item.summary || '');
+  const raw = item.raw || {};
+  const fromFeed = htmlToText(raw['content:encoded'] || raw.content || raw.summary || '');
   if (fromFeed.length >= MIN_ARTICLE_CHARS) return fromFeed;
 
-  if (item.link) {
+  if (item.url) {
     try {
-      const res = await fetch(item.link, {
+      const res = await fetch(item.url, {
         headers: { 'User-Agent': 'LocalPodStudio/1.0 (+https://localpod.co)' },
         signal: AbortSignal.timeout(20_000),
       });
       if (res.ok) {
         const { JSDOM } = require('jsdom');
         const { Readability } = require('@mozilla/readability');
-        const dom = new JSDOM(await res.text(), { url: item.link });
+        const dom = new JSDOM(await res.text(), { url: item.url });
         const article = new Readability(dom.window.document).parse();
         const fromPage = htmlToText(article?.content || '');
         if (fromPage.length > fromFeed.length) return fromPage;
       }
     } catch (err) {
-      console.error(`[feed-poller] page fetch failed for ${item.link}:`, err.message);
+      console.error(`[feed-poller] page fetch failed for ${item.url}:`, err.message);
     }
   }
   return fromFeed;
-}
-
-function itemPubDate(item) {
-  const d = item.isoDate ? new Date(item.isoDate)
-    : item.pubDate ? new Date(item.pubDate) : null;
-  return d && !isNaN(d) ? d : null;
 }
 
 /** Advance a run clock by intervalDays until it is in the future. */
@@ -65,25 +59,23 @@ async function runShowDigest(show, now) {
       now.getTime() - FIRST_RUN_MAX_AGE_MS,
     ));
 
-  const feed = await parser.parseURL(show.feedUrl);
-  const items = (feed.items || []).slice(0, 30);
+  const items = (await discoverArticles(show)).slice(0, 30);
 
   // Claim new items (newest first), keeping those published since the last run.
   const claimed = [];
   for (const item of items) {
-    const guid = item.guid || item.link;
-    if (!guid) continue;
+    if (!item.guid) continue;
 
     let record;
     try {
       record = await prisma.ingestedArticle.create({
-        data: { showId: show.id, guid, url: item.link || null, title: item.title || null },
+        data: { showId: show.id, guid: item.guid, url: item.url || null, title: item.title || null },
       });
     } catch {
       continue; // already seen in a prior run
     }
 
-    const pub = itemPubDate(item);
+    const pub = item.publishedAt && !isNaN(item.publishedAt) ? item.publishedAt : null;
     if (pub && pub.getTime() < since.getTime()) {
       await prisma.ingestedArticle.update({
         where: { id: record.id },
@@ -152,8 +144,9 @@ async function runShowDigest(show, now) {
   const digestTitle = segments.length === 1
     ? segments[0].title
     : `${show.name} digest — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const firstRaw = claimed[0].item.raw || {};
   const description = segments.length === 1
-    ? (htmlToText(claimed[0].item.contentSnippet || claimed[0].item.summary || '').slice(0, 500) || null)
+    ? (htmlToText(firstRaw.contentSnippet || firstRaw.summary || '').slice(0, 500) || null)
     : `Featuring: ${segments.map(s => s.title).join(' • ')}`.slice(0, 500);
 
   try {

@@ -37,8 +37,15 @@ Done:
 - Junk-text cleanup (`utils/cleanArticleText.js`): strips bylines, captions/credits, share/newsletter/"read more" boilerplate before narration.
 - Schema: `Show.automationIntervalDays/StartAt/NextRunAt/LastRunAt/AdSelections`; migration `20260619000000` applied to Supabase.
 
+**Non-RSS source roadmap (staged):** RSS-only entry is an adoption risk — many target sites (e.g. decorahnews.com) have no feed *or* sitemap. Building a pluggable article-source layer behind a single "Source URL" field with auto-detection. Stages: (1) source abstraction + auto-discovery + Test button ✅, (2) manual paste-a-URL, (3) sitemap ingestion, (4) homepage scraping (w/ per-show CSS selector). Email ingestion was considered and dropped.
+
+**Stage 1 shipped: source abstraction + auto-discovery + Test source.**
+- `automation/articleSource.js`: `detectSource(url)` resolves RSS directly / via declared `<link>` / via common paths; `discoverArticles(show)` dispatches on `Show.sourceType` (rss only so far) returning normalized `{guid,url,title,publishedAt,raw}`.
+- Poller refactored to call `discoverArticles` (source-agnostic). `POST /me/test-source` powers the Settings "Test source" button. New `Show.sourceType` column (null = rss); migration applied to Supabase.
+- Helper: `scripts/poll-feeds-once.js` fires one cycle on demand (surfaces feed errors the dashboard doesn't yet).
+
 Still open:
-- [ ] **End-to-end live test** — enable automation on a real show with a real feed, confirm a digest draft actually gets created (will spend ElevenLabs credits)
+- [ ] **End-to-end live test** — point a show at a real feed (NPR/BBC/Verge validated), confirm a digest draft gets created (will spend ElevenLabs credits)
 - [ ] **Failure visibility** — `IngestedArticle.status` is `failed`/`skipped` with an `error`, but there's no UI/notification surfacing it yet
 - [ ] Auto-publish path to Megaphone for shows set to full-auto (v2)
 - [ ] Per-article notification email on success/failure (v2)

@@ -41,7 +41,8 @@ model Show {
   adMarkerDefaults    String?      // JSON: { preRoll: bool, postRoll: bool, midRoll: number[] }
   megaphoneShowId     String?
   megaphoneRssUrl     String?
-  feedUrl             String?      // source RSS feed for automatic episode generation
+  feedUrl             String?      // resolved source URL the poller hits (feed/sitemap/homepage)
+  sourceType          String?      // how to discover articles: rss | sitemap | scrape (null = rss)
   automationEnabled   Boolean      @default(false)
   automationVoiceId   String?
   automationIntervalDays Int?      // generate a digest episode every N days (1–8)

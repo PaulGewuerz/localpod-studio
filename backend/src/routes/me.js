@@ -4,6 +4,9 @@ const prisma = require('../prisma');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { detectSource } = require('../automation/articleSource');
+
+const VALID_SOURCE_TYPES = ['rss', 'sitemap', 'scrape'];
 
 // Normalize the automation ad-selection blob to a known shape (or null).
 function sanitizeAdSelections(raw) {
@@ -75,9 +78,23 @@ router.post('/onboarded', async (req, res) => {
   res.json({ onboardedAt: user.onboardedAt });
 });
 
+// POST /me/test-source — detect/validate an article source URL before saving.
+// Returns the resolved source (type + URL) and a few sample headlines.
+router.post('/test-source', async (req, res) => {
+  const { url } = req.body;
+  if (!url?.trim()) return res.status(400).json({ ok: false, error: 'Enter a URL first.' });
+  try {
+    const result = await detectSource(url);
+    res.json(result);
+  } catch (err) {
+    console.error('test-source failed:', err.message);
+    res.status(500).json({ ok: false, error: 'Could not test that URL.' });
+  }
+});
+
 // PATCH /me — update show name, author, coverArtUrl, defaultVoiceId
 router.patch('/', async (req, res) => {
-  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults, feedUrl, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections } = req.body;
+  const { showId, showName, author, description, category, categories, defaultVoiceId, coverArtUrl, adMarkerDefaults, feedUrl, sourceType, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections } = req.body;
   const orgId = req.user.organization.id;
 
   // Normalize: accept either `categories` (array) or legacy `category` (string)
@@ -88,7 +105,7 @@ router.patch('/', async (req, res) => {
   const updates = [];
 
   const showFields = [showName, author, description, categoryValue, coverArtUrl, adMarkerDefaults,
-    feedUrl, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections];
+    feedUrl, sourceType, automationEnabled, automationVoiceId, automationIntervalDays, automationStartAt, automationAdSelections];
   if (showFields.some(v => v !== undefined)) {
     const show = showId
       ? await prisma.show.findFirst({ where: { id: showId, organizationId: orgId } })
@@ -102,6 +119,7 @@ router.patch('/', async (req, res) => {
       if (coverArtUrl !== undefined)       data.coverArtUrl = coverArtUrl;
       if (adMarkerDefaults !== undefined)  data.adMarkerDefaults = JSON.stringify(adMarkerDefaults);
       if (feedUrl !== undefined)           data.feedUrl = feedUrl || null;
+      if (sourceType !== undefined)        data.sourceType = VALID_SOURCE_TYPES.includes(sourceType) ? sourceType : null;
       if (automationEnabled !== undefined) data.automationEnabled = Boolean(automationEnabled);
       if (automationVoiceId !== undefined) data.automationVoiceId = automationVoiceId || null;
       if (automationIntervalDays !== undefined) {

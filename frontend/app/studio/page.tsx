@@ -41,6 +41,7 @@ interface ShowData {
   megaphoneShowId: string | null
   megaphoneRssUrl: string | null
   feedUrl: string | null
+  sourceType: string | null
   automationEnabled: boolean
   automationVoiceId: string | null
   automationIntervalDays: number | null
@@ -474,6 +475,9 @@ function StudioInner() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [settingsFeedUrl, setSettingsFeedUrl] = useState('')
+  const [settingsSourceType, setSettingsSourceType] = useState<string | null>(null)
+  const [testingSource, setTestingSource] = useState(false)
+  const [sourceTestResult, setSourceTestResult] = useState<{ ok: boolean; sourceType?: string; resolvedUrl?: string; itemCount?: number; sampleTitles?: string[]; error?: string } | null>(null)
   const [settingsAutomationEnabled, setSettingsAutomationEnabled] = useState(false)
   const [settingsAutomationVoiceId, setSettingsAutomationVoiceId] = useState('')
   const [settingsIntervalDays, setSettingsIntervalDays] = useState(1)
@@ -639,6 +643,8 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       setSettingsCoverPreview(activeShow.coverArtUrl ?? null)
       setSettingsCoverFile(null)
       setSettingsFeedUrl(activeShow.feedUrl ?? '')
+      setSettingsSourceType(activeShow.sourceType ?? null)
+      setSourceTestResult(null)
       setSettingsAutomationEnabled(activeShow.automationEnabled ?? false)
       setSettingsAutomationVoiceId(activeShow.automationVoiceId ?? '')
       setSettingsIntervalDays(activeShow.automationIntervalDays ?? 1)
@@ -822,6 +828,30 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     }
   }
 
+  async function handleTestSource() {
+    setTestingSource(true)
+    setSourceTestResult(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/me/test-source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url: settingsFeedUrl.trim() }),
+      })
+      const result = await res.json()
+      setSourceTestResult(result)
+      // On success, adopt the resolved source URL + detected type for saving.
+      if (result.ok) {
+        if (result.resolvedUrl) setSettingsFeedUrl(result.resolvedUrl)
+        setSettingsSourceType(result.sourceType ?? 'rss')
+      }
+    } catch {
+      setSourceTestResult({ ok: false, error: 'Could not reach the server. Try again.' })
+    } finally {
+      setTestingSource(false)
+    }
+  }
+
   async function handleSettingsSave() {
     setSettingsSaving(true)
     setSettingsError(null)
@@ -853,6 +883,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           description: settingsDescription || undefined,
           ...(coverArtUrl ? { coverArtUrl } : {}),
           feedUrl: settingsFeedUrl.trim(),
+          sourceType: settingsSourceType,
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
           automationIntervalDays: settingsIntervalDays,
@@ -880,6 +911,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           description: settingsDescription || s.description,
           ...(cacheBustedUrl ? { coverArtUrl: cacheBustedUrl } : {}),
           feedUrl: settingsFeedUrl.trim() || null,
+          sourceType: settingsSourceType,
           automationEnabled: settingsAutomationEnabled,
           automationVoiceId: settingsAutomationVoiceId || null,
           automationIntervalDays: settingsIntervalDays,
@@ -1795,15 +1827,52 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
                 <div className="mt-5">
                   <label className="block text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-2">
-                    Source RSS Feed
+                    Source URL
                   </label>
-                  <input
-                    type="url"
-                    value={settingsFeedUrl}
-                    onChange={e => setSettingsFeedUrl(e.target.value)}
-                    placeholder="https://yoursite.com/feed/"
-                    className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)]"
-                  />
+                  <div className="flex items-stretch gap-2">
+                    <input
+                      type="url"
+                      value={settingsFeedUrl}
+                      onChange={e => { setSettingsFeedUrl(e.target.value); setSourceTestResult(null) }}
+                      placeholder="RSS feed or your site’s homepage"
+                      className="flex-1 border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestSource}
+                      disabled={testingSource || !settingsFeedUrl.trim()}
+                      className="shrink-0 px-4 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-[var(--ink)] border border-[var(--rule)] rounded-[4px] hover:border-[var(--ink-faint)] disabled:opacity-50 transition-colors"
+                    >
+                      {testingSource ? 'Testing…' : 'Test source'}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[12px] text-[var(--ink-faint)] leading-relaxed">
+                    Paste an RSS feed, or just your homepage — we’ll find the feed for you.
+                  </p>
+
+                  {sourceTestResult && (
+                    sourceTestResult.ok ? (
+                      <div className="mt-3 rounded-[4px] border border-[var(--green)]/40 bg-[var(--green)]/5 px-3 py-2.5">
+                        <p className="text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--green)]">
+                          ✓ Found {sourceTestResult.sourceType?.toUpperCase()} feed{typeof sourceTestResult.itemCount === 'number' ? ` · ${sourceTestResult.itemCount} items` : ''}
+                        </p>
+                        {sourceTestResult.resolvedUrl && sourceTestResult.resolvedUrl !== settingsFeedUrl && (
+                          <p className="mt-1 text-[11px] text-[var(--ink-faint)] break-all">Using: {sourceTestResult.resolvedUrl}</p>
+                        )}
+                        {sourceTestResult.sampleTitles && sourceTestResult.sampleTitles.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {sourceTestResult.sampleTitles.slice(0, 3).map((t, i) => (
+                              <li key={i} className="text-[12px] text-[var(--ink-light)] truncate">• {t}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-[4px] border border-[var(--accent)]/40 bg-[var(--accent)]/5 px-3 py-2.5">
+                        <p className="text-[12px] text-[var(--accent)] leading-relaxed">{sourceTestResult.error}</p>
+                      </div>
+                    )
+                  )}
                 </div>
 
                 <div className="mt-5">
