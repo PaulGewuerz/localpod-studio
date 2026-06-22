@@ -1650,10 +1650,26 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             return (
             <div className="max-w-xl space-y-6">
 
+              {/* Your RSS feed URL */}
+              <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
+                <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Your RSS Feed</div>
+                <p className="text-[13px] text-[var(--ink-light)] mb-4">This is your podcast feed URL. Copy it and paste it into each directory below when submitting your show.</p>
+                {activeShow?.megaphoneRssUrl ? (
+                  <div className="relative">
+                    <pre className="bg-[var(--bg-warm)] border border-[var(--rule)] rounded-[4px] px-4 py-3 pr-20 text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--ink)] whitespace-pre-wrap break-all leading-relaxed">
+                      {activeShow.megaphoneRssUrl}
+                    </pre>
+                    <EmbedCopyButton code={activeShow.megaphoneRssUrl} />
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-[var(--ink-faint)]">Your RSS feed will appear here once your show is set up. Publish your first episode or reach out if it doesn't show up.</p>
+                )}
+              </div>
+
               {/* Directory submission links */}
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Submit to Directories</div>
-                <p className="text-[13px] text-[var(--ink-light)] mb-5">Submit your RSS feed to each platform to get listed. You'll need your RSS feed URL from the embed section below.</p>
+                <p className="text-[13px] text-[var(--ink-light)] mb-5">Submit your RSS feed to each platform to get listed. Use your RSS feed URL from the section above.</p>
                 <div className="divide-y divide-[var(--rule)]">
                   {directories.map(({ name, url }) => (
                     <div key={name} className="flex items-center justify-between py-3">
