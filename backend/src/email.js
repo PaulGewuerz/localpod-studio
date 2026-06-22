@@ -1,7 +1,7 @@
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM || 'LocalPod Studio <hello@localpod.co>';
+const FROM = process.env.EMAIL_FROM || 'LocalPod Studio <paul@localpod.co>';
 const STUDIO_URL = process.env.FRONTEND_URL || 'https://app.localpod.co';
 
 async function sendWelcomeEmail({ to, showName }) {
@@ -18,14 +18,14 @@ async function sendWelcomeEmail({ to, showName }) {
         </p>
         <p style="color:#555;margin-bottom:24px">
           To reach listeners on Apple Podcasts, Spotify, and other apps, your show needs to be
-          submitted to each directory once. You can submit it yourself using your RSS feed, or
-          reply to this email and we'll handle the submissions for you. Once a directory approves
-          the show (usually within a few days), new episodes appear automatically.
+          submitted to each directory once. Head to the Distribution tab in your studio, where you
+          can submit your show yourself or have us handle it for you. Once a directory approves the
+          show (usually within a few days), new episodes appear automatically.
         </p>
-        <a href="${STUDIO_URL}/studio"
+        <a href="${STUDIO_URL}/studio?nav=dist"
            style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
                   padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">
-          Open Studio →
+          Go to Distribution →
         </a>
         <p style="color:#999;font-size:12px;margin-top:40px">
           LocalPod Studio · If you have questions, reply to this email.
