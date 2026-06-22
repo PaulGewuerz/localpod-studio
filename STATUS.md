@@ -37,7 +37,9 @@ Done:
 - Junk-text cleanup (`utils/cleanArticleText.js`): strips bylines, captions/credits, share/newsletter/"read more" boilerplate before narration.
 - Schema: `Show.automationIntervalDays/StartAt/NextRunAt/LastRunAt/AdSelections`; migration `20260619000000` applied to Supabase.
 
-**Non-RSS source roadmap (staged):** RSS-only entry is an adoption risk — many target sites (e.g. decorahnews.com) have no feed *or* sitemap. Building a pluggable article-source layer behind a single "Source URL" field with auto-detection. Stages: (1) source abstraction + auto-discovery + Test button ✅, (2) manual paste-a-URL, (3) sitemap ingestion, (4) homepage scraping (w/ per-show CSS selector). Email ingestion was considered and dropped.
+**Non-RSS source roadmap (staged):** RSS-only entry is an adoption risk — many target sites (e.g. decorahnews.com) have no feed *or* sitemap. Building a pluggable article-source layer behind a single "Source URL" field with auto-detection. Stages: (1) source abstraction + auto-discovery + Test button ✅, (2) manual paste-a-URL ✅, (3) sitemap ingestion, (4) homepage scraping (w/ per-show CSS selector). Email ingestion was considered and dropped.
+
+**Stage 2 shipped: manual paste-a-URL.** New Episode has a "From URL" mode: paste one or more article links → `POST /generate/from-urls` fetches each via shared `utils/extractArticle.js` (Readability) → `generateDigestEpisode` (multiple URLs = one digest). Poller's page-fetch refactored onto the same util. Junk-text cleanup extended with nav boilerplate (skip-to-content/menu/search).
 
 **Stage 1 shipped: source abstraction + auto-discovery + Test source.**
 - `automation/articleSource.js`: `detectSource(url)` resolves RSS directly / via declared `<link>` / via common paths; `discoverArticles(show)` dispatches on `Show.sourceType` (rss only so far) returning normalized `{guid,url,title,publishedAt,raw}`.

@@ -1,6 +1,7 @@
 const prisma = require('../prisma');
 const { generateDigestEpisode } = require('../services/generateEpisode');
 const { discoverArticles } = require('./articleSource');
+const { fetchPageArticle } = require('../utils/extractArticle');
 const { htmlToText } = require('../utils/htmlToText');
 
 const POLL_INTERVAL_MS = 15 * 60 * 1000;
@@ -21,18 +22,8 @@ async function extractArticleText(item) {
 
   if (item.url) {
     try {
-      const res = await fetch(item.url, {
-        headers: { 'User-Agent': 'LocalPodStudio/1.0 (+https://localpod.co)' },
-        signal: AbortSignal.timeout(20_000),
-      });
-      if (res.ok) {
-        const { JSDOM } = require('jsdom');
-        const { Readability } = require('@mozilla/readability');
-        const dom = new JSDOM(await res.text(), { url: item.url });
-        const article = new Readability(dom.window.document).parse();
-        const fromPage = htmlToText(article?.content || '');
-        if (fromPage.length > fromFeed.length) return fromPage;
-      }
+      const { text: fromPage } = await fetchPageArticle(item.url);
+      if (fromPage.length > fromFeed.length) return fromPage;
     } catch (err) {
       console.error(`[feed-poller] page fetch failed for ${item.url}:`, err.message);
     }

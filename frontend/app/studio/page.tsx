@@ -442,7 +442,8 @@ function StudioInner() {
   const [monthlyCharacters, setMonthlyCharacters] = useState(0)
 
   // New Episode form state
-  const [epMode, setEpMode] = useState<'ai' | 'upload'>('ai')
+  const [epMode, setEpMode] = useState<'ai' | 'url' | 'upload'>('ai')
+  const [urlInput, setUrlInput] = useState('')
   const [epTitle, setEpTitle] = useState('')
   const [selectedVoiceId, setSelectedVoiceId] = useState('')
   const [script, setScript] = useState('')
@@ -743,6 +744,60 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     }
   }
 
+  async function handleGenerateFromUrls() {
+    const urls = urlInput.split(/[\s,]+/).map(u => u.trim()).filter(Boolean)
+    if (urls.length === 0) { setGenerateError('Paste at least one article URL.'); return }
+    if (!selectedVoiceId) { setGenerateError('Please select a voice.'); return }
+    const voice = voices.find(v => v.id === selectedVoiceId)
+    if (!voice) return
+
+    setGenerateError(null)
+    setLimitExceeded(false)
+    setNewEpStage('processing')
+    setProcessingStep(0)
+    const stepTimer1 = setTimeout(() => setProcessingStep(1), 600)
+    const stepTimer2 = setTimeout(() => setProcessingStep(2), 1800)
+
+    try {
+      const token = await getToken()
+      const genRes = await fetch(`${API_URL}/generate/from-urls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          urls,
+          voiceId: voice.elevenLabsId,
+          title: epTitle || undefined,
+          showId: activeShowId || undefined,
+        }),
+      })
+
+      clearTimeout(stepTimer1)
+      clearTimeout(stepTimer2)
+
+      if (genRes.status === 402) {
+        setLimitExceeded(true)
+        setNewEpStage('form')
+        return
+      }
+      if (!genRes.ok) {
+        const d = await genRes.json().catch(() => ({}))
+        throw new Error(d.error || `Generate failed (${genRes.status})`)
+      }
+
+      const genData = await genRes.json()
+      setEpisodeId(genData.episodeId)
+      setAudioUrl(genData.audioUrl)
+      setProcessingStep(3)
+      router.push(`/episodes/${genData.episodeId}/review`)
+    } catch (err: unknown) {
+      clearTimeout(stepTimer1)
+      clearTimeout(stepTimer2)
+      setGenerateError(err instanceof Error ? err.message : 'Something went wrong.')
+      setLimitExceeded(false)
+      setNewEpStage('form')
+    }
+  }
+
   async function handleUpload() {
     if (!uploadFile) { setGenerateError('Please select an audio file.'); return }
     setGenerateError(null)
@@ -781,6 +836,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     setEpMode('ai')
     setEpTitle('')
     setScript('')
+    setUrlInput('')
     setShowNotes('')
     setUploadFile(null)
     setNewEpStage('form')
@@ -1216,11 +1272,13 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)]">New Episode</div>
                       <div className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] mt-0.5">
-                        {epMode === 'ai' ? 'Paste your script → publish in minutes' : 'Upload audio → publish to your podcast'}
+                        {epMode === 'ai' ? 'Paste your script → publish in minutes'
+                          : epMode === 'url' ? 'Paste article links → we narrate them'
+                          : 'Upload audio → publish to your podcast'}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 bg-[var(--bg)] border border-[var(--rule)] rounded-[2px] p-0.5">
-                      {(['ai', 'upload'] as const).map(mode => (
+                      {(['ai', 'url', 'upload'] as const).map(mode => (
                         <button
                           key={mode}
                           onClick={() => setEpMode(mode)}
@@ -1228,7 +1286,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                             epMode === mode ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-faint)] hover:text-[var(--ink)]'
                           }`}
                         >
-                          {mode === 'ai' ? 'AI Voice' : 'Upload Audio'}
+                          {mode === 'ai' ? 'AI Voice' : mode === 'url' ? 'From URL' : 'Upload Audio'}
                         </button>
                       ))}
                     </div>
@@ -1254,7 +1312,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       </div>
                     </div>
 
-                    {epMode === 'ai' ? (
+                    {epMode !== 'upload' && (
                       <>
                         {/* Voice */}
                         <div className="flex flex-col gap-1.5 mb-5">
@@ -1296,7 +1354,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                           </div>
                         </div>
 
-                        {/* Script */}
+                        {epMode === 'ai' && (
                         <div className="flex flex-col gap-1.5 mb-5">
                           <div className="flex items-center justify-between">
                             <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Script</label>
@@ -1329,8 +1387,28 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                             <span>~{Math.max(1, Math.round(wordCount / 150))} min estimated</span>
                           </div>
                         </div>
+                        )}
+
+                        {epMode === 'url' && (
+                        <div className="flex flex-col gap-1.5 mb-5">
+                          <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Article URL(s)</label>
+                          <textarea
+                            className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] resize-y min-h-[140px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors"
+                            placeholder="Paste one or more article URLs, one per line…"
+                            value={urlInput}
+                            onChange={e => setUrlInput(e.target.value)}
+                          />
+                          <div className="flex gap-4 text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                            <span>{urlInput.split(/[\s,]+/).filter(Boolean).length} URL(s)</span>
+                            <span>·</span>
+                            <span>multiple links become one digest episode</span>
+                          </div>
+                        </div>
+                        )}
                       </>
-                    ) : (
+                    )}
+
+                    {epMode === 'upload' && (
                       /* Upload Audio */
                       <div className="flex flex-col gap-1.5 mb-5">
                         <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Audio File</label>
@@ -1412,10 +1490,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                         Cancel
                       </button>
                       <button
-                        onClick={epMode === 'ai' ? handleGenerate : handleUpload}
+                        onClick={epMode === 'ai' ? handleGenerate : epMode === 'url' ? handleGenerateFromUrls : handleUpload}
                         className="px-5 py-2.5 text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[#a83315] rounded-[2px] transition-colors"
                       >
-                        {epMode === 'ai' ? 'Next →' : 'Next →'}
+                        Next →
                       </button>
                     </div>
                   </div>
@@ -1433,15 +1511,17 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     />
                   </div>
                   <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1.5">
-                    {epMode === 'ai' ? 'Generating your episode…' : 'Uploading your episode…'}
+                    {epMode === 'upload' ? 'Uploading your episode…' : 'Generating your episode…'}
                   </div>
                   <div className="text-[13px] text-[var(--ink-light)] mb-7">
-                    {epMode === 'ai' ? 'This usually takes under a minute.' : 'Uploading and publishing…'}
+                    {epMode === 'upload' ? 'Uploading and publishing…' : 'This usually takes under a minute.'}
                   </div>
 
                   <div className="max-w-xs mx-auto text-left">
                     {(epMode === 'ai'
                       ? ['Parsing script', `Synthesizing voice (${voices.find(v => v.id === selectedVoiceId)?.name ?? '…'})`, 'Saving audio', 'Done']
+                      : epMode === 'url'
+                      ? ['Fetching articles', `Synthesizing voice (${voices.find(v => v.id === selectedVoiceId)?.name ?? '…'})`, 'Saving audio', 'Done']
                       : ['Preparing upload', 'Uploading audio', 'Saving audio', 'Done']
                     ).map((label, i) => {
                       const done = processingStep > i

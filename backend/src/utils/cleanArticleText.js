@@ -11,6 +11,8 @@
 const JUNK_LINE_PATTERNS = [
   /^advertisement$/i,
   /^sponsored( content)?$/i,
+  /^skip to (main )?content$/i,
+  /^(main menu|menu|search|sections)$/i,
   /^(share|tweet|share this|share this article|share on \w+)\b/i,
   /^(read more|read also|related|related stories|related articles|more from|see also)\b[:.]?/i,
   /^(sign up|subscribe)\b.*(newsletter|email|inbox|updates)/i,
