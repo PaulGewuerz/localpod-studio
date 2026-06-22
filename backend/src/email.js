@@ -17,7 +17,10 @@ async function sendWelcomeEmail({ to, showName }) {
           You can start generating and publishing podcast episodes right away.
         </p>
         <p style="color:#555;margin-bottom:24px">
-          Your podcast will appear on Apple Podcasts, Spotify, and all major apps within 72 hours.
+          To reach listeners on Apple Podcasts, Spotify, and other apps, your show needs to be
+          submitted to each directory once. You can submit it yourself using your RSS feed, or
+          reply to this email and we'll handle the submissions for you. Once a directory approves
+          the show (usually within a few days), new episodes appear automatically.
         </p>
         <a href="${STUDIO_URL}/studio"
            style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
