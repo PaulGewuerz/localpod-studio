@@ -18,17 +18,17 @@ const MIN_ARTICLE_CHARS = 400;        // below this, feed content is a teaser â€
 async function extractArticleText(item) {
   const raw = item.raw || {};
   const fromFeed = htmlToText(raw['content:encoded'] || raw.content || raw.summary || '');
-  if (fromFeed.length >= MIN_ARTICLE_CHARS) return fromFeed;
+  if (fromFeed.length >= MIN_ARTICLE_CHARS) return { text: fromFeed, title: null };
 
   if (item.url) {
     try {
-      const { text: fromPage } = await fetchPageArticle(item.url);
-      if (fromPage.length > fromFeed.length) return fromPage;
+      const { text: fromPage, title } = await fetchPageArticle(item.url);
+      if (fromPage.length > fromFeed.length) return { text: fromPage, title };
     } catch (err) {
       console.error(`[feed-poller] page fetch failed for ${item.url}:`, err.message);
     }
   }
-  return fromFeed;
+  return { text: fromFeed, title: null };
 }
 
 /** Advance a run clock by intervalDays until it is in the future. */
@@ -102,7 +102,7 @@ async function runShowDigest(show, now) {
       });
       continue;
     }
-    const text = await extractArticleText(item);
+    const { text, title: pageTitle } = await extractArticleText(item);
     if (text.length < MIN_ARTICLE_CHARS) {
       await prisma.ingestedArticle.update({
         where: { id: record.id },
@@ -110,7 +110,7 @@ async function runShowDigest(show, now) {
       });
       continue;
     }
-    segments.push({ title: item.title || 'Untitled', text });
+    segments.push({ title: item.title || pageTitle || 'Untitled', text });
     usedRecordIds.push(record.id);
   }
 

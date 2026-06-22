@@ -37,7 +37,9 @@ Done:
 - Junk-text cleanup (`utils/cleanArticleText.js`): strips bylines, captions/credits, share/newsletter/"read more" boilerplate before narration.
 - Schema: `Show.automationIntervalDays/StartAt/NextRunAt/LastRunAt/AdSelections`; migration `20260619000000` applied to Supabase.
 
-**Non-RSS source roadmap (staged):** RSS-only entry is an adoption risk — many target sites (e.g. decorahnews.com) have no feed *or* sitemap. Building a pluggable article-source layer behind a single "Source URL" field with auto-detection. Stages: (1) source abstraction + auto-discovery + Test button ✅, (2) manual paste-a-URL ✅, (3) sitemap ingestion, (4) homepage scraping (w/ per-show CSS selector). Email ingestion was considered and dropped.
+**Non-RSS source roadmap (staged):** RSS-only entry is an adoption risk — many target sites (e.g. decorahnews.com) have no feed *or* sitemap. Building a pluggable article-source layer behind a single "Source URL" field with auto-detection. Stages: (1) source abstraction + auto-discovery + Test button ✅, (2) manual paste-a-URL ✅, (3) sitemap ingestion ✅, (4) homepage scraping (w/ per-show CSS selector). Email ingestion was considered and dropped.
+
+**Stage 3 shipped: sitemap ingestion.** `detectSource` now falls back to a sitemap (the pasted URL itself, robots.txt `Sitemap:` entries, or common paths) when no RSS is found; RSS still preferred when both exist. `discoverArticles` handles `sourceType: 'sitemap'` — parses urlset + sitemapindex (follows news/article/post children first), reads `<news:title>`/`<news:publication_date>`/`<lastmod>`, newest first. Poller now backfills missing titles from the extracted page title (helps sitemap/scrape items). Verified against AP (sitemap fallback), Guardian news.xml, TechCrunch index.
 
 **Stage 2 shipped: manual paste-a-URL.** New Episode has a "From URL" mode: paste one or more article links → `POST /generate/from-urls` fetches each via shared `utils/extractArticle.js` (Readability) → `generateDigestEpisode` (multiple URLs = one digest). Poller's page-fetch refactored onto the same util. Junk-text cleanup extended with nav boilerplate (skip-to-content/menu/search).
 

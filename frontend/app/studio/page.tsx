@@ -1972,7 +1972,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     sourceTestResult.ok ? (
                       <div className="mt-3 rounded-[4px] border border-[var(--green)]/40 bg-[var(--green)]/5 px-3 py-2.5">
                         <p className="text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--green)]">
-                          ✓ Found {sourceTestResult.sourceType?.toUpperCase()} feed{typeof sourceTestResult.itemCount === 'number' ? ` · ${sourceTestResult.itemCount} items` : ''}
+                          ✓ Found {sourceTestResult.sourceType === 'sitemap' ? 'sitemap' : `${sourceTestResult.sourceType?.toUpperCase()} feed`}{typeof sourceTestResult.itemCount === 'number' ? ` · ${sourceTestResult.itemCount} items` : ''}
                         </p>
                         {sourceTestResult.resolvedUrl && sourceTestResult.resolvedUrl !== settingsFeedUrl && (
                           <p className="mt-1 text-[11px] text-[var(--ink-faint)] break-all">Using: {sourceTestResult.resolvedUrl}</p>
