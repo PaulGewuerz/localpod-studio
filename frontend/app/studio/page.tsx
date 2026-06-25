@@ -82,6 +82,12 @@ const NAV_TITLES: Record<NavKey, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Per-plan cap on podcast feeds (shows). Mirrors the backend in me.js — Solo = 1,
+// everything else gets the Publisher allowance of 3.
+function showLimitForPlan(plan: string | null | undefined): number {
+  return plan === 'solo' ? 1 : 3
+}
+
 async function getToken(): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
@@ -435,6 +441,9 @@ function StudioInner() {
 
   const [me, setMe] = useState<MeData | null>(null)
   const [activeShowId, setActiveShowId] = useState<string | null>(null)
+  const [newShowName, setNewShowName] = useState('')
+  const [creatingShow, setCreatingShow] = useState(false)
+  const [addShowError, setAddShowError] = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
   const [voices, setVoices] = useState<Voice[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
@@ -465,8 +474,6 @@ function StudioInner() {
   const [portalError, setPortalError] = useState<string | null>(null)
 
   // Distribution
-  const [distSubmitLoading, setDistSubmitLoading] = useState(false)
-  const [distSubmitDone, setDistSubmitDone] = useState(false)
 
   // Settings
   const [settingsName, setSettingsName] = useState('')
@@ -621,6 +628,34 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
   function launchTour() {
     startTour(() => markOnboarded())
+  }
+
+  // ── Create an additional show (podcast feed) ──────────────────────────────────
+  async function createShow() {
+    if (creatingShow) return
+    setAddShowError(null)
+    setCreatingShow(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/me/shows`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newShowName.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? res.statusText)
+      const show = data.show as ShowData
+      // Append to local state and jump to the new show so the user can fill in
+      // its details in Settings right away.
+      setMe(prev => prev ? { ...prev, shows: [...prev.shows, show] } : prev)
+      setActiveShowId(show.id)
+      setNewShowName('')
+      setActiveNav('settings')
+    } catch (err) {
+      setAddShowError(err instanceof Error ? err.message : 'Could not add show.')
+    } finally {
+      setCreatingShow(false)
+    }
   }
 
   // Auto-launch once for users who haven't seen the tour yet.
@@ -1693,7 +1728,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           )}
 
           {/* ── SHOWS ─────────────────────────────────────────────────── */}
-          {activeNav === 'shows' && (
+          {activeNav === 'shows' && (() => {
+            const showLimit = showLimitForPlan(me.subscription?.plan)
+            const atLimit = me.shows.length >= showLimit
+            return (
             <div className="max-w-xl space-y-3">
               {me.shows.length === 0 ? (
                 <p className="text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No show found.</p>
@@ -1726,8 +1764,52 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   </div>
                 </div>
               ))}
+
+              {/* Add another feed, up to the plan's limit */}
+              <div className="bg-white border border-[var(--rule)] rounded-[2px] p-6">
+                <div className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)] mb-1">
+                  Add a podcast feed
+                </div>
+                <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] mb-4">
+                  {me.shows.length} of {showLimit} feed{showLimit === 1 ? '' : 's'} used on your plan.
+                </p>
+                {atLimit ? (
+                  <p className="text-[13px] text-[var(--ink-light)]">
+                    You&apos;ve reached your plan&apos;s feed limit.{' '}
+                    <button onClick={() => setActiveNav('billing')} className="text-[var(--blue)] underline">Upgrade</button>{' '}
+                    to add more.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newShowName}
+                        onChange={e => setNewShowName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !creatingShow) createShow() }}
+                        placeholder="New show name"
+                        className="flex-1 border border-[var(--rule)] rounded-[2px] px-3 py-2 text-[13px] focus:outline-none focus:border-[var(--ink)]"
+                      />
+                      <button
+                        onClick={createShow}
+                        disabled={creatingShow}
+                        className="bg-[var(--ink)] text-white text-[13px] font-[family-name:var(--font-dm-mono)] px-4 py-2 rounded-[2px] disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {creatingShow ? 'Adding…' : 'Add show'}
+                      </button>
+                    </div>
+                    <p className="text-[12px] text-[var(--ink-faint)] mt-2">
+                      You&apos;ll set the cover art, description, and source on the next screen.
+                    </p>
+                  </>
+                )}
+                {addShowError && (
+                  <p className="text-[12px] text-red-500 font-[family-name:var(--font-dm-mono)] mt-2">{addShowError}</p>
+                )}
+              </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* ── DISTRIBUTION ──────────────────────────────────────────── */}
           {activeNav === 'dist' && (() => {
@@ -1741,21 +1823,6 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               { name: 'Pocket Casts', url: 'https://pocketcasts.com/submit' },
               { name: 'TuneIn', url: 'https://tunein.com/get-listed/' },
             ]
-
-            async function handleDistSubmit() {
-              setDistSubmitLoading(true)
-              try {
-                const token = await getToken()
-                await fetch(`${API_URL}/distribution/submit-request`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ showId: activeShow?.id }),
-                })
-                setDistSubmitDone(true)
-              } finally {
-                setDistSubmitLoading(false)
-              }
-            }
 
             return (
             <div className="max-w-xl space-y-6">
@@ -1800,18 +1867,20 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               {/* Have LocalPod do it */}
               <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                 <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Prefer We Handle It?</div>
-                <p className="text-[13px] text-[var(--ink-light)] mb-4">We'll submit your podcast to all major directories on your behalf. Approvals typically take 2–5 business days — we'll email you once everything is live.</p>
-                {distSubmitDone ? (
-                  <p className="text-[13px] font-semibold text-[var(--ink)]">Request sent — we'll be in touch.</p>
-                ) : (
-                  <button
-                    onClick={handleDistSubmit}
-                    disabled={distSubmitLoading}
-                    className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
-                  >
-                    {distSubmitLoading ? 'Sending…' : 'Have LocalPod Submit for Me →'}
-                  </button>
-                )}
+                <p className="text-[13px] text-[var(--ink-light)] mb-3">Happy to do the heavy lifting with you on a quick screen-share. Here&apos;s why it&apos;s a call and not a form:</p>
+                <ul className="text-[13px] text-[var(--ink-light)] space-y-1.5 mb-4 list-disc pl-5 marker:text-[var(--ink-faint)]">
+                  <li>Your show stays <span className="font-semibold text-[var(--ink)]">in your name</span> — we never take ownership of your podcast inside Apple, Spotify, or the other apps.</li>
+                  <li>Most directories email a <span className="font-semibold text-[var(--ink)]">one-time verification code</span> to confirm ownership. You read those to us live and we paste them in as we go.</li>
+                  <li>We submit to every major platform together in one sitting — usually about 15 minutes.</li>
+                </ul>
+                <a
+                  href="https://calendly.com/mto-audio/podcast-app-submissions"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] transition-colors"
+                >
+                  Book a submission call →
+                </a>
               </div>
 
               {/* Embed player */}
