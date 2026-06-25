@@ -4,6 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LocalPod Studio — The podcast platform built for digital publishers</title>
+  <meta name="description" content="LocalPod Studio turns your existing articles into broadcast-quality podcasts — automatically. No studio, no staff, no extra hours. Publish to Apple Podcasts, Spotify, and your RSS feed." />
+  <link rel="canonical" href="https://localpod.co/" />
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://localpod.co/" />
+  <meta property="og:site_name" content="LocalPod Studio" />
+  <meta property="og:title" content="The podcast platform built for digital publishers" />
+  <meta property="og:description" content="Turn your existing articles into broadcast-quality podcasts — automatically. No studio. No staff. No extra hours." />
+  <meta property="og:image" content="https://localpod.co/logo.png" />
+  <meta property="og:image:alt" content="LocalPod Studio" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="The podcast platform built for digital publishers" />
+  <meta name="twitter:description" content="Turn your existing articles into broadcast-quality podcasts — automatically. No studio. No staff. No extra hours." />
+  <meta name="twitter:image" content="https://localpod.co/logo.png" />
+
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -236,6 +254,37 @@
       background: var(--white);
       transform: translateY(-2px);
       box-shadow: 0 16px 40px rgba(45,212,191,0.3);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.04);
+      color: var(--off-white);
+      padding: 16px 32px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      border: 1px solid var(--navy-border);
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(45,212,191,0.4);
+      color: var(--white);
+      transform: translateY(-2px);
+    }
+
+    .hero-trial-note {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+      position: relative;
+      z-index: 1;
+      margin-top: 4px;
     }
 
     /* ── STUDIO MOCKUP ── */
@@ -864,6 +913,96 @@
 
     .step p { font-size: 15px; color: var(--text); line-height: 1.7; }
 
+    /* ── DEMO VIDEO ── */
+    .demo-section { padding: 0 80px 100px; }
+
+    .demo-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .demo-inner .section-tag { justify-content: center; }
+
+    .demo-inner .section-headline {
+      margin: 0 auto 20px;
+      max-width: 640px;
+    }
+
+    .demo-sub {
+      font-size: 18px;
+      font-weight: 300;
+      color: var(--text);
+      max-width: 520px;
+      margin: 0 auto 48px;
+      line-height: 1.65;
+    }
+
+    .video-frame {
+      position: relative;
+      width: 100%;
+      max-width: 880px;
+      margin: 0 auto;
+      aspect-ratio: 16 / 9;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--navy-border);
+      box-shadow:
+        0 0 0 1px rgba(45,212,191,0.08),
+        0 32px 80px rgba(0,0,0,0.6),
+        0 0 120px rgba(45,212,191,0.06);
+      cursor: pointer;
+      background: #000;
+    }
+
+    .video-frame iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .video-thumb {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .video-frame::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(11,15,26,0.1) 0%, rgba(11,15,26,0.45) 100%);
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.3s;
+    }
+
+    .video-frame.playing::after { opacity: 0; }
+
+    .video-play {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 84px; height: 84px;
+      border-radius: 50%;
+      background: var(--teal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 16px 48px rgba(45,212,191,0.4);
+      transition: transform 0.2s, background 0.2s;
+      z-index: 2;
+    }
+
+    .video-frame:hover .video-play { transform: translate(-50%, -50%) scale(1.08); background: var(--white); }
+    .video-frame.playing .video-play { display: none; }
+
+    .video-play svg { margin-left: 4px; }
+
     /* ── VALUE PROPS ── */
     .value-section { padding: 0 80px 100px; }
 
@@ -1069,8 +1208,9 @@
       Start free trial
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
     </a>
-    <p style="margin-top:12px; font-size:13px; color:var(--ink-faint, #999); font-family:var(--font-dm-mono, monospace);">7-day free trial included</p>
+    <a href="https://calendly.com/mto-audio/localpod-studio-demo" class="btn-secondary">Schedule a demo</a>
   </div>
+  <p class="hero-trial-note fade-up d4">7-day free trial included</p>
 
   <div class="studio-mockup fade-up d5">
 
@@ -1228,6 +1368,29 @@
         <div class="step-num">03</div>
         <h3>Publish to all podcast apps</h3>
         <p>Your episode goes live on Apple Podcasts, Spotify, and your RSS feed — with show notes included.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO VIDEO -->
+<section class="demo-section">
+  <div class="demo-inner">
+    <div class="section-tag">See it in action</div>
+    <h2 class="section-headline">Watch an article become a podcast.</h2>
+    <p class="demo-sub">A two-minute walkthrough of the full flow — from pasting a story to a published episode.</p>
+    <div class="video-frame" id="video-frame" data-video="rtm134wNfx8">
+      <img
+        class="video-thumb"
+        src="https://i.ytimg.com/vi/rtm134wNfx8/maxresdefault.jpg"
+        alt="Watch the LocalPod Studio demo"
+        loading="lazy"
+        width="880" height="495"
+      />
+      <div class="video-play" aria-hidden="true">
+        <svg width="30" height="34" viewBox="0 0 30 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M28 14.4a3 3 0 0 1 0 5.2L5 32.9A3 3 0 0 1 0.5 30.3V3.7A3 3 0 0 1 5 1.1L28 14.4Z" fill="#0b0f1a"/>
+        </svg>
       </div>
     </div>
   </div>
@@ -1417,6 +1580,24 @@
     el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
     observer.observe(el);
   });
+</script>
+<script>
+  // ── Lazy-load YouTube embed on click (keeps page fast, no tracking until play) ──
+  (function () {
+    const frame = document.getElementById('video-frame');
+    if (!frame) return;
+    frame.addEventListener('click', () => {
+      if (frame.classList.contains('playing')) return;
+      const id = frame.dataset.video;
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0';
+      iframe.title = 'LocalPod Studio demo';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      iframe.allowFullscreen = true;
+      frame.appendChild(iframe);
+      frame.classList.add('playing');
+    });
+  })();
 </script>
 <script>
   const hamburger = document.getElementById('nav-hamburger');
