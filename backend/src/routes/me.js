@@ -6,6 +6,8 @@ const { supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
 const { detectSource, previewScrape } = require('../automation/articleSource');
 const { showLimitForPlan } = require('../utils/planLimits');
+const { provisionMegaphoneShow } = require('../services/provisionShow');
+const { sendSMS } = require('../notify');
 
 const VALID_SOURCE_TYPES = ['rss', 'sitemap', 'scrape'];
 
@@ -87,9 +89,10 @@ router.post('/onboarded', async (req, res) => {
 });
 
 // POST /me/shows — create an additional podcast feed (show) for the org, up to
-// the plan's feed limit. Megaphone provisioning happens lazily at first publish
-// (provisionMegaphoneShow), exactly like the show created at signup — so a new
-// show starts as a draft feed the user fills in via Settings.
+// the plan's feed limit. The Megaphone podcast is provisioned immediately so the
+// feed and its RSS URL exist as soon as the show is created (a podcaster's first
+// move is usually to submit the feed to Apple/Spotify — before publishing). The
+// user fills in remaining details via Settings, which sync to Megaphone on PATCH.
 router.post('/shows', async (req, res) => {
   const orgId = req.user.organization.id;
   const limit = showLimitForPlan(req.user.organization.subscription?.plan);
@@ -107,7 +110,25 @@ router.post('/shows', async (req, res) => {
     : 'Untitled Show';
 
   const show = await prisma.show.create({ data: { name, organizationId: orgId } });
-  res.status(201).json({ show });
+
+  // Provision the Megaphone podcast now, not lazily at first publish, so the
+  // feed exists for distribution right away. Slug collisions are handled inside
+  // provisionMegaphoneShow. If it fails, keep the show (the user doesn't lose
+  // their feed) but surface it: flag the response and alert the owner, so it can
+  // be retried/fixed rather than silently leaving a feed with no Megaphone show.
+  let provisioningFailed = false;
+  try {
+    const { megaphoneShowId, megaphoneRssUrl } = await provisionMegaphoneShow(show, { fallbackTitle: name });
+    show.megaphoneShowId = megaphoneShowId;
+    show.megaphoneRssUrl = megaphoneRssUrl;
+  } catch (err) {
+    provisioningFailed = true;
+    console.error('Megaphone provisioning failed for new feed:', err.message);
+    sendSMS(`LocalPod provisioning FAILED for new feed "${name}" (${req.user.email}): ${err.message} — needs manual Megaphone setup`)
+      .catch(smsErr => console.error('Provisioning-failure SMS failed:', smsErr.message));
+  }
+
+  res.status(201).json({ show, provisioningFailed });
 });
 
 // POST /me/test-source — detect/validate an article source URL before saving.
