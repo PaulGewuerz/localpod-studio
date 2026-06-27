@@ -21,17 +21,42 @@ async function provisionMegaphoneShow(show, { fallbackTitle } = {}) {
 
   const adapter = getHostingAdapter();
   const showTitle = show.name ?? fallbackTitle ?? 'Untitled Show';
-  const slug = showTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const baseSlug = showTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'show';
 
-  const { id: megaphoneShowId, rssUrl } = await adapter.createPodcast({
-    title: showTitle,
-    slug,
-    summary: show.description,
-    category: show.category,
-    author: show.author || showTitle,
-    ownerName: show.author || showTitle,
-    ownerEmail: 'paul@localpod.co',
-  });
+  // Megaphone slugs must be unique across the network. Two shows with the same
+  // title (common — e.g. two publishers, or repeated test signups) would collide
+  // and createPodcast would 422. Try the clean slug first, then fall back to a
+  // slug suffixed with part of the show id (stable across retries of the same
+  // show). The RSS feed URL is keyed off the Megaphone podcast id, not the slug,
+  // so the suffix has no user-facing effect.
+  const idSuffix = String(show.id).replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase();
+  const slugCandidates = [baseSlug, `${baseSlug}-${idSuffix}`];
+
+  let created;
+  for (let i = 0; i < slugCandidates.length; i++) {
+    try {
+      created = await adapter.createPodcast({
+        title: showTitle,
+        slug: slugCandidates[i],
+        summary: show.description,
+        category: show.category,
+        author: show.author || showTitle,
+        ownerName: show.author || showTitle,
+        ownerEmail: 'paul@localpod.co',
+      });
+      break;
+    } catch (err) {
+      const isSlugConflict = err.status === 422 || /slug|taken|already|exist/i.test(err.message || '');
+      const hasMoreCandidates = i < slugCandidates.length - 1;
+      if (isSlugConflict && hasMoreCandidates) {
+        console.warn(`Megaphone slug "${slugCandidates[i]}" rejected (${err.message}); retrying with "${slugCandidates[i + 1]}"`);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  const { id: megaphoneShowId, rssUrl } = created;
   console.log('Megaphone show created:', megaphoneShowId);
 
   if (show.coverArtUrl) {

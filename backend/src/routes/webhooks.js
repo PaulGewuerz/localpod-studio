@@ -53,7 +53,12 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
               try {
                 await provisionMegaphoneShow(show, { fallbackTitle: user.organization.name });
               } catch (err) {
+                // Don't fail the webhook (the account/subscription is already set
+                // up), but don't fail silently either — a show with no Megaphone
+                // podcast can't publish or distribute, so alert the owner.
                 console.error('Megaphone show creation failed:', err.message);
+                sendSMS(`LocalPod provisioning FAILED for ${obj.customer_email} (${show.name}): ${err.message} — show needs manual Megaphone setup`)
+                  .catch(smsErr => console.error('Provisioning-failure SMS failed:', smsErr.message));
               }
             }
 
