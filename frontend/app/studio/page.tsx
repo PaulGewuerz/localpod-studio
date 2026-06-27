@@ -82,8 +82,12 @@ const NAV_TITLES: Record<NavKey, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Per-plan cap on podcast feeds (shows). Mirrors the backend in me.js — Solo = 1,
-// everything else gets the Publisher allowance of 3.
+// Per-plan cap on podcast feeds (shows). Solo = 1, everything else gets the
+// Publisher allowance of 3 (same fail-open convention as the backend: unknown/
+// null plans are NOT downgraded). This is a UI hint only — the real cap is
+// enforced server-side by showLimitForPlan in backend/src/utils/planLimits.js
+// (the single source of truth). Keep this in sync with that file if the limits
+// change; the backend is authoritative.
 function showLimitForPlan(plan: string | null | undefined): number {
   return plan === 'solo' ? 1 : 3
 }

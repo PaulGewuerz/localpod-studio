@@ -63,6 +63,7 @@ Still open:
 ## TODO — Other open items
 
 - [ ] **Stripe cancellation work landed under a mislabeled commit** — `sendCancellationEmail`/`sendCancellationAdminEmail` (email.js) + `cancel_at_period_end` webhook handler + GET /me cancellation read were accidentally swept into commit `146caaf` ("Update STATUS.md"). Code is complete, syntax-clean, and **live in production**. Only downside is the commit message; fixing it cleanly needs a force-push to `master`. **Decision pending:** leave as-is or rewrite history.
+- [ ] **Reconcile `Subscription.plan` against live Stripe (data-layer fix)** — `plan` is unreliable (some active publishers stored as `null`, paul@localpod.co was mislabeled `solo`). Caps/gating fail open to Publisher so legacy accounts aren't downgraded, but a Publisher mislabeled `solo` is wrongly capped (e.g. 1 podcast feed via `showLimitForPlan`). Can't be fixed per-request (live Stripe price is prod-only). Needs a one-time reconciliation job mapping each org's live Stripe subscription price → plan. Must run against prod/Railway (local `STRIPE_SECRET_KEY` is test-mode).
 - [ ] **Megaphone legacy campaign API sunsets July 14, 2026** — any DAI work must target v2 before then
 - [ ] Decide fate of untracked working-tree files: `backend/test-output-*.mp3`, `backend/scripts/debug-show.js`, `frontend/netlify.toml`, `landing/generating-screenshot.html` (gitignore, commit, or delete)
 - [ ] Voice roster update in `backend/prisma/seed.js` (9 voices) — uncommitted; needs commit + seed run against Supabase to take effect
