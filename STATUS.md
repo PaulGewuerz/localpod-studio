@@ -71,6 +71,7 @@ Still open:
 
 ## Done (recent, newest first)
 
+- Multi-feed creation in the dashboard: `POST /me/shows` (per-plan cap — solo 1 / publisher 3) + "Add a podcast feed" form on the Shows tab. Megaphone provisioning stays lazy (at first publish). Frontend multi-show UI (switcher, Shows tab, per-show settings) already existed; this fills the missing "create another show" path. New shows land on Settings to fill in details.
 - Automatic episode flow v2: scheduled digest, per-show ad placement, junk-text cleanup (`ac8945b`)
 - Automatic episode flow v1: RSS feed → draft episodes (`bb8a89b`)
 - Stripe cancellation emails (customer + admin) on cancel-at-period-end (`146caaf` — see Other open items re: commit message)

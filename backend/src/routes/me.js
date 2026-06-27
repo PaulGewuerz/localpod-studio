@@ -8,6 +8,15 @@ const { detectSource, previewScrape } = require('../automation/articleSource');
 
 const VALID_SOURCE_TYPES = ['rss', 'sitemap', 'scrape'];
 
+// Per-plan cap on podcast feeds (shows). Solo = 1, Publisher = 3. Anything that
+// isn't 'solo' gets the Publisher allowance, matching blockSoloPlan's "everything
+// that isn't solo gets the feature" convention so future tiers work unchanged.
+const SHOW_LIMITS = { solo: 1, publisher: 3 };
+const DEFAULT_SHOW_LIMIT = 3;
+function showLimitForPlan(plan) {
+  return SHOW_LIMITS[plan] ?? DEFAULT_SHOW_LIMIT;
+}
+
 // Normalize per-source options to a known shape (or null).
 function sanitizeSourceConfig(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -83,6 +92,30 @@ router.post('/onboarded', async (req, res) => {
     data: { onboardedAt: req.user.onboardedAt ?? new Date() },
   });
   res.json({ onboardedAt: user.onboardedAt });
+});
+
+// POST /me/shows — create an additional podcast feed (show) for the org, up to
+// the plan's feed limit. Megaphone provisioning happens lazily at first publish
+// (provisionMegaphoneShow), exactly like the show created at signup — so a new
+// show starts as a draft feed the user fills in via Settings.
+router.post('/shows', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const limit = showLimitForPlan(req.user.organization.subscription?.plan);
+
+  const count = await prisma.show.count({ where: { organizationId: orgId } });
+  if (count >= limit) {
+    return res.status(403).json({
+      error: `Your plan includes up to ${limit} podcast feed${limit === 1 ? '' : 's'}. Upgrade to add more.`,
+      upgradeRequired: true,
+    });
+  }
+
+  const name = typeof req.body?.name === 'string' && req.body.name.trim()
+    ? req.body.name.trim().slice(0, 200)
+    : 'Untitled Show';
+
+  const show = await prisma.show.create({ data: { name, organizationId: orgId } });
+  res.status(201).json({ show });
 });
 
 // POST /me/test-source — detect/validate an article source URL before saving.
