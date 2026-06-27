@@ -1330,7 +1330,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       </div>
                     </div>
                     <div className="flex items-center gap-1 bg-[var(--bg)] border border-[var(--rule)] rounded-[2px] p-0.5">
-                      {(['ai', 'url', 'upload'] as const).map(mode => (
+                      {/* 'url' (From URL) temporarily removed — not reliable yet. Re-add to
+                          this array to restore the toggle; the rest of the wiring is intact. */}
+                      {(['ai', 'upload'] as const).map(mode => (
                         <button
                           key={mode}
                           onClick={() => setEpMode(mode)}
@@ -1338,7 +1340,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                             epMode === mode ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-faint)] hover:text-[var(--ink)]'
                           }`}
                         >
-                          {mode === 'ai' ? 'AI Voice' : mode === 'url' ? 'From URL' : 'Upload Audio'}
+                          {mode === 'ai' ? 'AI Voice' : 'Upload Audio'}
                         </button>
                       ))}
                     </div>
