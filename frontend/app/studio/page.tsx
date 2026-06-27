@@ -1360,9 +1360,26 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink)]">Show</label>
-                        <div className="border border-[var(--rule)] rounded-[2px] px-3 py-2.5 text-[13px] bg-[var(--bg-warm)] text-[var(--ink-light)]">
-                          {(me.shows.find(s => s.id === activeShowId) ?? me.shows[0])?.name ?? me.org.name}
-                        </div>
+                        {(() => {
+                          const selectedShow = me.shows.find(s => s.id === activeShowId) ?? me.shows[0] ?? null
+                          return (
+                            <div className="border border-[var(--rule)] rounded-[2px] px-3 py-2 text-[13px] bg-[var(--bg-warm)] text-[var(--ink-light)] flex items-center gap-3">
+                              {selectedShow?.coverArtUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={selectedShow.coverArtUrl}
+                                  alt={selectedShow.name}
+                                  className="w-11 h-11 rounded-[2px] object-cover shrink-0 border border-[var(--rule)]"
+                                />
+                              ) : (
+                                <div className="w-11 h-11 rounded-[2px] bg-[var(--bg)] border border-[var(--rule)] shrink-0 flex items-center justify-center text-[var(--ink-faint)] text-[9px] font-[family-name:var(--font-dm-mono)] text-center leading-tight">
+                                  No art
+                                </div>
+                              )}
+                              <span className="truncate font-medium text-[var(--ink)]">{selectedShow?.name ?? me.org.name}</span>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
 
