@@ -71,6 +71,7 @@ Still open:
 
 ## Done (recent, newest first)
 
+- Distribution "Prefer We Handle It?" now books a call instead of POSTing a submit-request. Button links to `calendly.com/mto-audio/podcast-app-submissions` and explains why it's a live call: the customer's show stays in their name (we don't take ownership in Apple/Spotify/etc.), and most directories email one-time verification codes the customer reads to us during the screen-share. Removed the unused `handleDistSubmit` handler + `distSubmit*` state (frontend only; backend `/distribution/submit-request` route left in place, now unused). Shipped in the "Distribution: book a call…" commit.
 - Multi-feed creation in the dashboard: `POST /me/shows` (per-plan cap — solo 1 / publisher 3) + "Add a podcast feed" form on the Shows tab. Megaphone provisioning stays lazy (at first publish). Frontend multi-show UI (switcher, Shows tab, per-show settings) already existed; this fills the missing "create another show" path. New shows land on Settings to fill in details.
 - Automatic episode flow v2: scheduled digest, per-show ad placement, junk-text cleanup (`ac8945b`)
 - Automatic episode flow v1: RSS feed → draft episodes (`bb8a89b`)
