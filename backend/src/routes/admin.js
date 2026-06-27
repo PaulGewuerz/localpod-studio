@@ -14,7 +14,7 @@ router.get('/publishers', async (req, res) => {
       defaultVoiceId: true,
       createdAt: true,
       users: { select: { id: true, email: true, name: true } },
-      subscription: { select: { status: true, plan: true } },
+      subscription: { select: { status: true, plan: true, currentPeriodStart: true } },
       defaultVoice: { select: { id: true, name: true } },
       shows: {
         orderBy: { createdAt: 'asc' },
@@ -27,18 +27,14 @@ router.get('/publishers', async (req, res) => {
 
   const showIds = orgs.flatMap(o => o.shows.map(s => s.id));
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Fallback only — matches routes/episodes.js /usage for orgs with no subscription.
+  const fallbackPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [totalStats, monthlyStats, latestEpisodes] = await Promise.all([
+  const [totalStats, latestEpisodes] = await Promise.all([
     prisma.episode.groupBy({
       by: ['showId'],
       where: { showId: { in: showIds } },
       _count: { id: true },
-      _sum: { characterCount: true },
-    }),
-    prisma.episode.groupBy({
-      by: ['showId'],
-      where: { showId: { in: showIds }, createdAt: { gte: startOfMonth } },
       _sum: { characterCount: true },
     }),
     prisma.episode.findMany({
@@ -49,8 +45,23 @@ router.get('/publishers', async (req, res) => {
     }),
   ]);
 
+  // "Monthly" usage is each publisher's current billing cycle (currentPeriodStart),
+  // matching what the customer sees in /usage — not a shared calendar month. Each
+  // org has its own period start, so aggregate per org rather than with one filter.
+  const monthlyByShow = {};
+  await Promise.all(orgs.map(async (org) => {
+    const orgShowIds = org.shows.map(s => s.id);
+    if (orgShowIds.length === 0) return;
+    const periodStart = org.subscription?.currentPeriodStart ?? fallbackPeriodStart;
+    const stats = await prisma.episode.groupBy({
+      by: ['showId'],
+      where: { showId: { in: orgShowIds }, createdAt: { gte: periodStart } },
+      _sum: { characterCount: true },
+    });
+    for (const s of stats) monthlyByShow[s.showId] = s._sum.characterCount ?? 0;
+  }));
+
   const totalByShow = Object.fromEntries(totalStats.map(s => [s.showId, { count: s._count.id, chars: s._sum.characterCount ?? 0 }]));
-  const monthlyByShow = Object.fromEntries(monthlyStats.map(s => [s.showId, s._sum.characterCount ?? 0]));
   const lastEpByShow = Object.fromEntries(latestEpisodes.map(e => [e.showId, { at: e.createdAt, status: e.status }]));
 
   const result = orgs.map(org => ({
