@@ -24,6 +24,18 @@ router.post('/create-checkout-session', async (req, res) => {
     include: { organization: { include: { subscription: true } } },
   });
   const existingSub = user?.organization?.subscription;
+
+  // Record the chosen plan on the subscription as soon as checkout starts, so a
+  // brand-new account reflects its tier (e.g. Solo's 50k cap) immediately rather
+  // than showing the default until checkout.session.completed lands. The webhook
+  // re-confirms plan from the Stripe price once payment completes.
+  if (user?.organization && existingSub) {
+    await prisma.subscription.update({
+      where: { organizationId: user.organization.id },
+      data: { plan },
+    });
+  }
+
   let trialDays = 7;
   if (existingSub?.stripeSubscriptionId) {
     trialDays = 0;

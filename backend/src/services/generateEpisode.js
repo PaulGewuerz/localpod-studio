@@ -4,10 +4,10 @@ const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
 const { cleanArticleText } = require('../utils/cleanArticleText');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
+const { characterLimitForPlan } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
-const CHARACTER_LIMIT = 150_000;
 
 class GenerationError extends Error {
   constructor(message, code, status = 500) {
@@ -59,7 +59,8 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
     _sum: { characterCount: true },
   });
   const usedChars = usage._sum.characterCount ?? 0;
-  if (usedChars + processedText.length > CHARACTER_LIMIT) {
+  const characterLimit = characterLimitForPlan(org.subscription?.plan);
+  if (usedChars + processedText.length > characterLimit) {
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
 
@@ -257,7 +258,8 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
     _sum: { characterCount: true },
   });
   const usedChars = usage._sum.characterCount ?? 0;
-  if (usedChars + processedText.length > CHARACTER_LIMIT) {
+  const characterLimit = characterLimitForPlan(org.subscription?.plan);
+  if (usedChars + processedText.length > characterLimit) {
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
 

@@ -450,6 +450,7 @@ function StudioInner() {
   const [loadingEpisodes, setLoadingEpisodes] = useState(true)
   const [episodeRefreshKey, setEpisodeRefreshKey] = useState(0)
   const [monthlyCharacters, setMonthlyCharacters] = useState(0)
+  const [characterLimit, setCharacterLimit] = useState<number | null>(null)
 
   // New Episode form state
   const [epMode, setEpMode] = useState<'ai' | 'url' | 'upload'>('ai')
@@ -603,6 +604,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         if (usageRes.ok) {
           const data = await usageRes.json()
           setMonthlyCharacters(data.monthlyCharacters)
+          if (typeof data.characterLimit === 'number') setCharacterLimit(data.characterLimit)
         }
       } catch { /* silent */ }
       finally { setLoadingEpisodes(false) }
@@ -1095,7 +1097,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   const cancelDateStr = me?.subscription?.cancelAt
     ? new Date(me.subscription.cancelAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
-  const CHARACTER_LIMIT = isSolo ? 50_000 : 150_000
+  // Prefer the limit reported by the backend (single source of truth in
+  // planLimits.js). Fall back to a plan map — defaulting to the publisher cap so
+  // legacy/unknown plans are never downgraded — if usage hasn't loaded yet.
+  const CHARACTER_LIMIT = characterLimit ?? (isSolo ? 50_000 : 150_000)
   const monthlyCharCount = monthlyCharacters
 
   // ── Sidebar nav item ──────────────────────────────────────────────────────────

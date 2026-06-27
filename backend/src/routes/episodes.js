@@ -7,6 +7,7 @@ const { spliceSegment } = require('../utils/stitchAudio');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { characterLimitForPlan } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -21,7 +22,10 @@ router.get('/usage', async (req, res) => {
     where: { show: { organizationId: orgId }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
   });
-  res.json({ monthlyCharacters: usage._sum.characterCount ?? 0 });
+  res.json({
+    monthlyCharacters: usage._sum.characterCount ?? 0,
+    characterLimit: characterLimitForPlan(subscription?.plan),
+  });
 });
 
 router.get('/', async (req, res) => {
