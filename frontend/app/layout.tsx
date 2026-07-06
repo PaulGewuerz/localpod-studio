@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -35,7 +36,10 @@ export default function RootLayout({
       lang="en"
       className={`${nunito.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <ImpersonationBanner />
+      </body>
     </html>
   );
 }

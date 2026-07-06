@@ -451,6 +451,14 @@ export default function AdminPage() {
                       {pub.users.map(u => (
                         <span key={u.id} className="flex items-center gap-1 text-xs text-gray-500">
                           {u.email}
+                          <a
+                            href={`/studio?impersonate=${encodeURIComponent(u.email)}`}
+                            target="_blank"
+                            className="text-blue-500 hover:underline"
+                            title="Open the studio as this user (new tab)"
+                          >
+                            View as
+                          </a>
                           <button
                             onClick={() => handleDeleteUser(pub.id, u.id, u.email)}
                             disabled={saving === `del-user-${u.id}`}
