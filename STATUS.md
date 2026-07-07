@@ -62,6 +62,7 @@ Still open:
 
 ## TODO — Other open items
 
+- [ ] **OP3 analytics — two manual steps to go live:** (1) add the OP3 prefix `https://op3.dev/e/` to each podcast in the Megaphone UI (podcast Settings → Megaphone Settings → Feed Prefixes → Custom) — start with A-Towner; NOT settable via the API (verified: unknown PUT fields are silently ignored, 2026-07). Counting starts at install with no backfill — do it ASAP. (2) Mint a real OP3 API key at https://op3.dev/api/keys and set `OP3_API_TOKEN` on Railway (code falls back to OP3's public sample token `preview07ce`). Also: add the prefix step to the new-show provisioning checklist.
 - [ ] **Stripe cancellation work landed under a mislabeled commit** — `sendCancellationEmail`/`sendCancellationAdminEmail` (email.js) + `cancel_at_period_end` webhook handler + GET /me cancellation read were accidentally swept into commit `146caaf` ("Update STATUS.md"). Code is complete, syntax-clean, and **live in production**. Only downside is the commit message; fixing it cleanly needs a force-push to `master`. **Decision pending:** leave as-is or rewrite history.
 - [ ] **Reconcile `Subscription.plan` against live Stripe (data-layer fix)** — `plan` is unreliable (some active publishers stored as `null`, paul@localpod.co was mislabeled `solo`). Caps/gating fail open to Publisher so legacy accounts aren't downgraded, but a Publisher mislabeled `solo` is wrongly capped (e.g. 1 podcast feed via `showLimitForPlan`). Can't be fixed per-request (live Stripe price is prod-only). Needs a one-time reconciliation job mapping each org's live Stripe subscription price → plan. Must run against prod/Railway (local `STRIPE_SECRET_KEY` is test-mode).
 - [ ] **Megaphone legacy campaign API sunsets July 14, 2026** — any DAI work must target v2 before then
@@ -71,6 +72,8 @@ Still open:
 ---
 
 ## Done (recent, newest first)
+
+- **Analytics tab now backed by OP3** (2026-07-07) — Megaphone's public API has no analytics (episode objects carry no download fields; `/downloads`, `/analytics`, `/metrics`, `/stats`, `/reports` all 404 — verified live; the S3 Metrics Export is Enterprise-only). Downloads now come from OP3 (op3.dev prefix analytics, free): new `backend/src/adapters/analytics/op3.js` (show lookup by base64url feed URL, per-episode `downloadsAll`/`downloads30` joined to Megaphone episodes by RSS item guid, monthly/weekly rollups). `GET /analytics` response keeps its shape + adds `trackingEnabled`/`note`/`monthlyDownloads`/`weeklyDownloads`/`asof`; shows without the prefix installed degrade to the existing "Request analytics report" flow. **Blocked on two manual steps — see Other open items.**
 
 - **Paragraph take history** (2026-07-07, `72e0c01`) — regenerating a paragraph on the review page no longer discards the previous audio. Each take (including the pre-regen original, extracted from the full audio on first regen) is stored as a standalone MP3 in Supabase Storage and tracked in `paragraphMeta` (`takes[]` + `activeTake` — JSON only, no migration). New `POST /episodes/:id/paragraphs/:order/takes/:takeIndex/restore` splices a saved take back in; review page shows a per-paragraph "Versions" strip (play + "Use this"). Full regeneration recomputes `paragraphMeta`, so takes reset then (intended — timings/text no longer apply). Note: take files accumulate in storage; no cleanup yet.
 

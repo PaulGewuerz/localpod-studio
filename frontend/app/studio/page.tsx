@@ -295,7 +295,11 @@ function AnalyticsView({ showId }: { showId: string | null }) {
   const [data, setData] = useState<{
     available: boolean
     reason?: string
+    trackingEnabled?: boolean
+    note?: string | null
     totalDownloads?: number
+    monthlyDownloads?: number | null
+    asof?: string | null
     episodes?: { id: string | null; megaphoneId: string; title: string; pubdate: string; duration: number; downloads: number }[]
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -345,7 +349,7 @@ function AnalyticsView({ showId }: { showId: string | null }) {
             <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
               {(data.totalDownloads ?? 0).toLocaleString()}
             </div>
-            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">All time</div>
+            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Since tracking began</div>
           </div>
           <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Episodes</div>
@@ -360,6 +364,10 @@ function AnalyticsView({ showId }: { showId: string | null }) {
             <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">Per episode</div>
           </div>
         </div>
+      )}
+
+      {data.note && (
+        <p className="mb-4 text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">{data.note}</p>
       )}
 
       {/* Episode breakdown */}
