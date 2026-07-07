@@ -7,11 +7,20 @@ import AdMarkersPanel from './AdMarkersPanel'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+interface ParagraphTake {
+  url: string
+  duration: number
+  text: string
+  createdAt: string
+}
+
 interface ParagraphMeta {
   order: number
   text: string
   timeStart: number
   timeEnd: number
+  takes?: ParagraphTake[]
+  activeTake?: number | null
 }
 
 interface AdMarkers {
@@ -55,6 +64,11 @@ export default function EpisodeReviewPage() {
   const [editingOrder, setEditingOrder] = useState<number | null>(null)
   const [editedText, setEditedText] = useState('')
   const [regeneratingOrder, setRegeneratingOrder] = useState<number | null>(null)
+
+  // Paragraph take (version) state — keys are `${order}:${takeIndex}`
+  const [restoringTake, setRestoringTake] = useState<string | null>(null)
+  const [playingTake, setPlayingTake] = useState<string | null>(null)
+  const takeAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Full-script fallback state (when no paragraphMeta)
   const [fullEditing, setFullEditing] = useState(false)
@@ -120,7 +134,10 @@ export default function EpisodeReviewPage() {
 
   // Stop and clean up on unmount
   useEffect(() => {
-    return () => { audioRef.current?.pause() }
+    return () => {
+      audioRef.current?.pause()
+      takeAudioRef.current?.pause()
+    }
   }, [])
 
   // Fetch download count for published episodes
@@ -140,6 +157,8 @@ export default function EpisodeReviewPage() {
 
   function playParagraph(para: ParagraphMeta) {
     if (!episode?.audioUrl) return
+    takeAudioRef.current?.pause()
+    setPlayingTake(null)
     if (!audioRef.current) audioRef.current = new Audio()
     const audio = audioRef.current
 
@@ -203,6 +222,48 @@ export default function EpisodeReviewPage() {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setRegeneratingOrder(null)
+    }
+  }
+
+  function playTake(url: string, key: string) {
+    audioRef.current?.pause()
+    setPlayingOrder(null)
+    if (!takeAudioRef.current) takeAudioRef.current = new Audio()
+    const audio = takeAudioRef.current
+
+    if (playingTake === key) {
+      audio.pause()
+      setPlayingTake(null)
+      return
+    }
+
+    audio.src = url
+    audio.onended = () => setPlayingTake(null)
+    setPlayingTake(key)
+    audio.play().catch(() => setPlayingTake(null))
+  }
+
+  async function handleRestoreTake(order: number, takeIndex: number) {
+    const key = `${order}:${takeIndex}`
+    setRestoringTake(key)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/paragraphs/${order}/takes/${takeIndex}/restore`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Restore failed (${res.status})`)
+      }
+      const updated = await res.json()
+      setEpisode(prev => prev ? { ...prev, audioUrl: updated.audioUrl, status: 'draft' } : prev)
+      setParagraphs(updated.paragraphMeta)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setRestoringTake(null)
     }
   }
 
@@ -491,29 +552,81 @@ export default function EpisodeReviewPage() {
                         </div>
                       </div>
                     ) : (
-                      <div
-                        className="px-3.5 py-3 flex items-start gap-2"
-                        onClick={() => editingOrder === null && startEditParagraph(para)}
-                      >
-                        <p className="flex-1 text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
-                          {para.text}
-                        </p>
-                        <button
-                          onClick={e => { e.stopPropagation(); playParagraph(para) }}
-                          className="shrink-0 mt-0.5 w-6 h-6 flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
-                          title={playingOrder === para.order ? 'Stop' : 'Play paragraph'}
+                      <>
+                        <div
+                          className="px-3.5 py-3 flex items-start gap-2"
+                          onClick={() => editingOrder === null && startEditParagraph(para)}
                         >
-                          {playingOrder === para.order ? (
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                              <rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/>
-                            </svg>
-                          ) : (
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                              <path d="M2 1.5l7 3.5-7 3.5V1.5z"/>
-                            </svg>
-                          )}
-                        </button>
-                      </div>
+                          <p className="flex-1 text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
+                            {para.text}
+                          </p>
+                          <button
+                            onClick={e => { e.stopPropagation(); playParagraph(para) }}
+                            className="shrink-0 mt-0.5 w-6 h-6 flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+                            title={playingOrder === para.order ? 'Stop' : 'Play paragraph'}
+                          >
+                            {playingOrder === para.order ? (
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                                <rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/>
+                              </svg>
+                            ) : (
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                                <path d="M2 1.5l7 3.5-7 3.5V1.5z"/>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        {(para.takes?.length ?? 0) > 1 && (
+                          <div className="border-t border-[var(--rule)] px-3.5 py-2 flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.06em] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)]">
+                              Versions
+                            </span>
+                            {para.takes!.map((take, i) => {
+                              const key = `${para.order}:${i}`
+                              const isActive = para.activeTake === i
+                              const isRestoring = restoringTake === key
+                              return (
+                                <span
+                                  key={i}
+                                  className={`inline-flex items-center gap-1.5 border rounded-[2px] pl-1.5 pr-2 py-0.5 text-[11px] font-[family-name:var(--font-dm-mono)] transition-colors ${
+                                    isActive
+                                      ? 'border-[var(--ink)] text-[var(--ink)] bg-white'
+                                      : 'border-[var(--rule)] text-[var(--ink-faint)] bg-white'
+                                  }`}
+                                >
+                                  <button
+                                    onClick={e => { e.stopPropagation(); playTake(take.url, key) }}
+                                    className="w-4 h-4 flex items-center justify-center hover:text-[var(--ink)] transition-colors"
+                                    title={playingTake === key ? 'Stop' : 'Play this version'}
+                                  >
+                                    {playingTake === key ? (
+                                      <svg width="8" height="8" viewBox="0 0 10 10" fill="currentColor">
+                                        <rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/>
+                                      </svg>
+                                    ) : (
+                                      <svg width="8" height="8" viewBox="0 0 10 10" fill="currentColor">
+                                        <path d="M2 1.5l7 3.5-7 3.5V1.5z"/>
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <span>{i === 0 ? 'Original' : `Take ${i + 1}`}</span>
+                                  {isActive ? (
+                                    <span className="text-[10px] text-[var(--green)]">✓ in use</span>
+                                  ) : (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleRestoreTake(para.order, i) }}
+                                      disabled={restoringTake !== null || regeneratingOrder !== null}
+                                      className="text-[10px] font-semibold text-[var(--blue)] hover:underline disabled:opacity-50"
+                                    >
+                                      {isRestoring ? 'Restoring…' : 'Use this'}
+                                    </button>
+                                  )}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )

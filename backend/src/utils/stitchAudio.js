@@ -104,6 +104,33 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
 }
 
 /**
+ * Extract a time-bounded segment from a full audio file.
+ *
+ * @param {string} fullAudioUrl - public URL of the current full episode audio
+ * @param {number} timeStart    - segment start in seconds
+ * @param {number} timeEnd      - segment end in seconds
+ * @returns {Buffer}            - the extracted segment as MP3
+ */
+async function extractSegment(fullAudioUrl, timeStart, timeEnd) {
+  const tmp = os.tmpdir();
+  const id = `lp_ex_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const rawPath  = path.join(tmp, `${id}_raw`);
+  const fullPath = path.join(tmp, `${id}_full.mp3`);
+  const outPath  = path.join(tmp, `${id}_seg.mp3`);
+
+  try {
+    await downloadToTemp(fullAudioUrl, rawPath);
+    // Normalise to MP3 so cutSegment can stream-copy cleanly regardless of source format
+    await execAsync(`ffmpeg -y -i "${rawPath}" -acodec libmp3lame -ar 44100 -ab 128k -ac 2 "${fullPath}"`);
+    await cutSegment(fullPath, outPath, timeStart, timeEnd);
+    return await fs.readFile(outPath);
+  } finally {
+    await Promise.all([rawPath, fullPath, outPath].map(p => fs.unlink(p).catch(() => {})));
+  }
+}
+
+/**
  * Stitch publisher ad campaigns into episode audio.
  * Pre-rolls are prepended, post-rolls are appended, mid-rolls are inserted at insertAt seconds.
  *
@@ -182,4 +209,4 @@ async function stitchCampaigns(episodeAudioUrl, assignments, campaignAudioUrls) 
   }
 }
 
-module.exports = { spliceSegment, stitchCampaigns };
+module.exports = { spliceSegment, extractSegment, stitchCampaigns };

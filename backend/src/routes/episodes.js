@@ -3,11 +3,12 @@ const router = express.Router();
 const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
-const { spliceSegment } = require('../utils/stitchAudio');
+const { spliceSegment, extractSegment } = require('../utils/stitchAudio');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
 const { characterLimitForPlan } = require('../utils/planLimits');
+const { MAX_TTS_CHARS } = require('../services/generateEpisode');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -283,6 +284,10 @@ router.post('/:id/regenerate', async (req, res) => {
 
   const normalizedText = normalizeForTTS(scriptText);
 
+  if (normalizedText.length > MAX_TTS_CHARS) {
+    return res.status(422).json({ error: `Script is too long (${normalizedText.length} characters, max ${MAX_TTS_CHARS})` });
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     console.log('[TTS regenerate] first 200 chars:', normalizedText.slice(0, 200));
   }
@@ -299,8 +304,7 @@ router.post('/:id/regenerate', async (req, res) => {
       },
       body: JSON.stringify({
         text: normalizedText,
-        model_id: 'eleven_turbo_v2_5',
-        language_code: 'en',
+        model_id: 'eleven_multilingual_v2',
         voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     });
@@ -395,8 +399,7 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
       },
       body: JSON.stringify({
         text: normalizedText,
-        model_id: 'eleven_turbo_v2_5',
-        language_code: 'en',
+        model_id: 'eleven_multilingual_v2',
         voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     });
@@ -437,13 +440,145 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
 
   const { data: { publicUrl } } = supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(storagePath);
 
-  // Update paragraph metadata: update this para's text + timeEnd, shift subsequent paras
   const oldDuration = para.timeEnd - para.timeStart;
+
+  // Version history: keep every take of this paragraph so a good one is never lost.
+  // Take files are standalone paragraph audio; the current segment is saved as the
+  // original take before the first regen replaces it. Non-fatal on storage failure.
+  let takes = para.takes || [];
+  let activeTake = null;
+  try {
+    const updatedTakes = [...takes];
+    if (updatedTakes.length === 0) {
+      const originalBuffer = await extractSegment(episode.audioUrl, para.timeStart, para.timeEnd);
+      const originalPath = `${orgId}/${id}_para${order}_take${Date.now()}_orig.mp3`;
+      const { error: origError } = await supabaseAdmin.storage
+        .from(AUDIO_BUCKET)
+        .upload(originalPath, originalBuffer, { contentType: 'audio/mpeg' });
+      if (origError) throw new Error(origError.message);
+      updatedTakes.push({
+        url: supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(originalPath).data.publicUrl,
+        duration: oldDuration,
+        text: para.text,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    const takePath = `${orgId}/${id}_para${order}_take${Date.now()}.mp3`;
+    const { error: takeError } = await supabaseAdmin.storage
+      .from(AUDIO_BUCKET)
+      .upload(takePath, newAudioBuffer, { contentType: 'audio/mpeg' });
+    if (takeError) throw new Error(takeError.message);
+    updatedTakes.push({
+      url: supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(takePath).data.publicUrl,
+      duration: newDuration,
+      text,
+      createdAt: new Date().toISOString(),
+    });
+    takes = updatedTakes;
+    activeTake = takes.length - 1;
+  } catch (err) {
+    console.error('Paragraph take history error (non-fatal):', err.message);
+  }
+
+  // Update paragraph metadata: update this para's text + timeEnd, shift subsequent paras
   const shift = newDuration - oldDuration;
 
   const updatedParagraphs = paragraphs.map(p => {
     if (p.order === order) {
-      return { ...p, text, timeEnd: p.timeStart + newDuration };
+      return { ...p, text, timeEnd: p.timeStart + newDuration, takes, activeTake };
+    }
+    if (p.order > order) {
+      return { ...p, timeStart: p.timeStart + shift, timeEnd: p.timeEnd + shift };
+    }
+    return p;
+  });
+
+  await prisma.episode.update({
+    where: { id },
+    data: {
+      audioUrl: publicUrl,
+      paragraphMeta: JSON.stringify(updatedParagraphs),
+      status: 'draft',
+    },
+  });
+
+  res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs });
+});
+
+// POST /episodes/:id/paragraphs/:order/takes/:takeIndex/restore — swap a saved take back into the audio
+router.post('/:id/paragraphs/:order/takes/:takeIndex/restore', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id, order: orderStr, takeIndex: takeIndexStr } = req.params;
+  const order = parseInt(orderStr, 10);
+  const takeIndex = parseInt(takeIndexStr, 10);
+
+  if (isNaN(order) || isNaN(takeIndex)) {
+    return res.status(400).json({ error: 'order and takeIndex must be numbers' });
+  }
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+  if (!episode.audioUrl) {
+    return res.status(400).json({ error: 'Episode has no audio' });
+  }
+  if (!episode.paragraphMeta) {
+    return res.status(400).json({ error: 'Episode has no paragraph metadata' });
+  }
+
+  const paragraphs = JSON.parse(episode.paragraphMeta);
+  const para = paragraphs.find(p => p.order === order);
+  if (!para) return res.status(404).json({ error: `Paragraph ${order} not found` });
+
+  const take = para.takes?.[takeIndex];
+  if (!take) return res.status(404).json({ error: `Take ${takeIndex} not found` });
+  if (para.activeTake === takeIndex) {
+    return res.status(400).json({ error: 'This take is already in use' });
+  }
+
+  let takeBuffer;
+  try {
+    const takeRes = await fetch(take.url);
+    if (!takeRes.ok) throw new Error(`fetch failed (${takeRes.status})`);
+    takeBuffer = Buffer.from(await takeRes.arrayBuffer());
+  } catch (err) {
+    console.error('Take download error:', err.message);
+    return res.status(500).json({ error: 'Failed to download the saved take' });
+  }
+
+  // Stitch: replace [para.timeStart, para.timeEnd] in the full audio with the saved take
+  let stitchedBuffer;
+  try {
+    stitchedBuffer = await spliceSegment(episode.audioUrl, takeBuffer, para.timeStart, para.timeEnd);
+  } catch (err) {
+    console.error('Stitch error:', err.message);
+    return res.status(500).json({ error: 'Audio stitching failed — is ffmpeg installed?' });
+  }
+
+  const storagePath = `${orgId}/${id}_${Date.now()}.mp3`;
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(AUDIO_BUCKET)
+    .upload(storagePath, stitchedBuffer, { contentType: 'audio/mpeg' });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError.message);
+    return res.status(500).json({ error: 'Failed to store stitched audio' });
+  }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(storagePath);
+
+  // Update paragraph metadata: restore this para's text + timing, shift subsequent paras
+  const oldDuration = para.timeEnd - para.timeStart;
+  const shift = take.duration - oldDuration;
+
+  const updatedParagraphs = paragraphs.map(p => {
+    if (p.order === order) {
+      return { ...p, text: take.text, timeEnd: p.timeStart + take.duration, activeTake: takeIndex };
     }
     if (p.order > order) {
       return { ...p, timeStart: p.timeStart + shift, timeEnd: p.timeEnd + shift };
