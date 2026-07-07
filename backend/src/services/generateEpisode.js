@@ -8,6 +8,8 @@ const { characterLimitForPlan } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
+// eleven_multilingual_v2 rejects requests over 10,000 characters; keep headroom.
+const MAX_TTS_CHARS = 9500;
 
 class GenerationError extends Error {
   constructor(message, code, status = 500) {
@@ -64,6 +66,10 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
 
+  if (processedText.length > MAX_TTS_CHARS) {
+    throw new GenerationError(`Script is too long (${processedText.length} characters, max ${MAX_TTS_CHARS})`, 'script_too_long', 422);
+  }
+
   // Call ElevenLabs with-timestamps endpoint
   const response = await fetch(`${ELEVENLABS_API_URL}/${voiceElevenLabsId}/with-timestamps`, {
     method: 'POST',
@@ -73,8 +79,7 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
     },
     body: JSON.stringify({
       text: processedText,
-      model_id: 'eleven_turbo_v2_5',
-      language_code: 'en',
+      model_id: 'eleven_multilingual_v2',
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   });
@@ -239,6 +244,21 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
   }
 
   const SEPARATOR = '\n\n';
+
+  // eleven_multilingual_v2 caps a request at 10k characters. Segments arrive
+  // newest first, so drop the oldest articles until the digest fits.
+  let dropped = 0;
+  while (processedSegments.length > 1 && processedSegments.join(SEPARATOR).length > MAX_TTS_CHARS) {
+    processedSegments.pop();
+    dropped++;
+  }
+  if (dropped > 0) {
+    console.warn(`[digest] dropped ${dropped} oldest article(s) to fit ${MAX_TTS_CHARS}-char TTS limit (show ${show.id})`);
+  }
+  if (processedSegments.join(SEPARATOR).length > MAX_TTS_CHARS) {
+    throw new GenerationError(`Script is too long (max ${MAX_TTS_CHARS} characters)`, 'script_too_long', 422);
+  }
+
   const processedText = processedSegments.join(SEPARATOR);
 
   // Character offset where each segment begins in the combined script.
@@ -271,8 +291,7 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
     },
     body: JSON.stringify({
       text: processedText,
-      model_id: 'eleven_turbo_v2_5',
-      language_code: 'en',
+      model_id: 'eleven_multilingual_v2',
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   });
@@ -341,4 +360,4 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
   });
 }
 
-module.exports = { generateDraftEpisode, generateDigestEpisode, GenerationError };
+module.exports = { generateDraftEpisode, generateDigestEpisode, GenerationError, MAX_TTS_CHARS };

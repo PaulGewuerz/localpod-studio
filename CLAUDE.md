@@ -44,7 +44,7 @@ localpod-studio/
 - Google OAuth via `madetoorderaudio.com` parent org
 
 ### Key Integrations
-- **ElevenLabs** — TTS generation (`eleven_turbo_v2_5` with `language_code: 'en'` to prevent accent drift); ~4,500 credits per 900-word article
+- **ElevenLabs** — TTS generation (`eleven_multilingual_v2`, switched from Turbo v2.5 on 2026-07-06 after audio-quality complaints; costs 1 credit/char — double Turbo — and caps requests at 10k chars, guarded at 9,500 in code)
 - **Megaphone** — RSS hosting and episode publishing via API (Professional plan, $99/month); legacy campaign API sunsets July 14, 2026 — any DAI work must target v2
 - **Stripe** — Billing; webhooks point to `https://api.localpod.co/webhooks/stripe`
 - **Resend** — SMTP for Supabase auth emails, sent from `paul@localpod.co`

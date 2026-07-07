@@ -1,7 +1,7 @@
 # LocalPod Studio — Status & TODO
 
 > Living doc. Update this at the end of every working session.
-> Last updated: 2026-06-15
+> Last updated: 2026-07-07
 
 ---
 
@@ -72,6 +72,12 @@ Still open:
 
 ## Done (recent, newest first)
 
+- **Paragraph take history** (2026-07-07, `72e0c01`) — regenerating a paragraph on the review page no longer discards the previous audio. Each take (including the pre-regen original, extracted from the full audio on first regen) is stored as a standalone MP3 in Supabase Storage and tracked in `paragraphMeta` (`takes[]` + `activeTake` — JSON only, no migration). New `POST /episodes/:id/paragraphs/:order/takes/:takeIndex/restore` splices a saved take back in; review page shows a per-paragraph "Versions" strip (play + "Use this"). Full regeneration recomputes `paragraphMeta`, so takes reset then (intended — timings/text no longer apply). Note: take files accumulate in storage; no cleanup yet.
+
+- **Admin impersonation** (2026-07-06, `f60ee5c`) — "View as" link next to each user email on /admin opens /studio in a new tab acting as that customer (see what they see, edit episodes for them). Backend honors `X-Impersonate-Email` only when the bearer token belongs to `ADMIN_EMAIL` (shared resolver `utils/resolveAuthUser.js`, used by both requireAuth and requireActiveSubscription); every impersonated request is console-logged on Railway. Frontend: `lib/impersonation.ts` patches window.fetch (per-tab via sessionStorage), amber bottom banner with Exit. Writes made while impersonating are real.
+
+- **TTS model switched to `eleven_multilingual_v2`** (2026-07-06) — Turbo v2.5 was producing weird audio for users. All 9 roster voices verified compatible via ElevenLabs API (`scripts/check-voice-models.js`); smoke-tested `/with-timestamps` with the new model (`scripts/smoke-multilingual-v2.js`). Removed `language_code` (multilingual v2 rejects it). Added `MAX_TTS_CHARS = 9500` guard (multilingual v2 caps at 10k/request vs Turbo's 40k): digests drop oldest articles to fit; single-article + full-regen paths return `script_too_long`. Note: 1 credit/char = double Turbo's cost.
+
 - Distribution "Prefer We Handle It?" now books a call instead of POSTing a submit-request. Button links to `calendly.com/mto-audio/podcast-app-submissions` and explains why it's a live call: the customer's show stays in their name (we don't take ownership in Apple/Spotify/etc.), and most directories email one-time verification codes the customer reads to us during the screen-share. Removed the unused `handleDistSubmit` handler + `distSubmit*` state (frontend only; backend `/distribution/submit-request` route left in place, now unused). Shipped in the "Distribution: book a call…" commit.
 - Multi-feed creation in the dashboard: `POST /me/shows` (per-plan cap — solo 1 / publisher 3) + "Add a podcast feed" form on the Shows tab. Megaphone provisioning stays lazy (at first publish). Frontend multi-show UI (switcher, Shows tab, per-show settings) already existed; this fills the missing "create another show" path. New shows land on Settings to fill in details.
 - Automatic episode flow v2: scheduled digest, per-show ad placement, junk-text cleanup (`ac8945b`)
@@ -91,6 +97,6 @@ Still open:
 ## Quick reference
 
 - **Deploys:** push to `master` = live. Frontend → Netlify (`app.localpod.co`), backend → Railway (`api.localpod.co`).
-- **TTS:** `eleven_turbo_v2_5`, `language_code: 'en'` (prevents accent drift), stability 0.5 / similarity 0.75. 40k chars max per request; typical article ~5–6k. 150k chars/month limit per org.
+- **TTS:** `eleven_multilingual_v2` (no `language_code` — multilingual v2 rejects it), stability 0.5 / similarity 0.75. 10k chars max per request (`MAX_TTS_CHARS = 9500` guard; digests drop oldest articles to fit); typical article ~5–6k. Costs 1 credit/char (double Turbo v2.5). 150k chars/month limit per org.
 - **Audio pipeline files:** `backend/src/routes/generate.js` (create), `backend/src/routes/episodes.js` (regen full + per-paragraph), `backend/src/utils/stitchAudio.js` + `preparePublishAudio.js` (ffmpeg splice/ads), `backend/src/utils/paragraphMeta.js` (timing helpers).
 - **Episode lifecycle:** draft → approved → published (+ `scheduled` flipped lazily to `published` in GET /episodes).
