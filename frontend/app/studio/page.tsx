@@ -1593,7 +1593,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     {epMode === 'upload' ? 'Uploading your episode…' : 'Generating your episode…'}
                   </div>
                   <div className="text-[13px] text-[var(--ink-light)] mb-7">
-                    {epMode === 'upload' ? 'Uploading and publishing…' : 'This usually takes under a minute.'}
+                    {epMode === 'upload' ? 'Uploading and publishing…' : 'This usually takes under 2 minutes.'}
                   </div>
 
                   <div className="max-w-xs mx-auto text-left">
