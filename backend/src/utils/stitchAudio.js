@@ -104,6 +104,28 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
 }
 
 /**
+ * Concatenate audio buffers into one MP3 (re-encoded for clean frame boundaries).
+ * @param {Buffer[]} buffers - ordered audio buffers
+ * @returns {Buffer}
+ */
+async function concatAudioBuffers(buffers) {
+  if (buffers.length === 1) return buffers[0];
+
+  const tmp = os.tmpdir();
+  const id = `lp_cat_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const inPaths = buffers.map((_, i) => path.join(tmp, `${id}_${i}.mp3`));
+  const outPath = path.join(tmp, `${id}_out.mp3`);
+
+  try {
+    await Promise.all(buffers.map((b, i) => fs.writeFile(inPaths[i], b)));
+    await concatSegments(inPaths, outPath);
+    return await fs.readFile(outPath);
+  } finally {
+    await Promise.all([...inPaths, outPath].map(p => fs.unlink(p).catch(() => {})));
+  }
+}
+
+/**
  * Extract a time-bounded segment from a full audio file.
  *
  * @param {string} fullAudioUrl - public URL of the current full episode audio
@@ -209,4 +231,4 @@ async function stitchCampaigns(episodeAudioUrl, assignments, campaignAudioUrls) 
   }
 }
 
-module.exports = { spliceSegment, extractSegment, stitchCampaigns };
+module.exports = { spliceSegment, extractSegment, stitchCampaigns, concatAudioBuffers };

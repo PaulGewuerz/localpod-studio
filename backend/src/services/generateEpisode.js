@@ -4,6 +4,7 @@ const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
 const { cleanArticleText } = require('../utils/cleanArticleText');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
+const { concatAudioBuffers } = require('../utils/stitchAudio');
 const { characterLimitForPlan } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -28,11 +29,116 @@ function applyPronunciationRules(text, rules) {
   return result;
 }
 
+function splitPreserving(text, regex) {
+  return text.split(regex).filter(s => s.length > 0);
+}
+
+/**
+ * Split text into TTS-sized chunks at paragraph boundaries (falling back to
+ * sentence boundaries, then a hard slice). Every character of the input is
+ * preserved so the chunks concatenate back to the exact original text — this
+ * keeps merged alignment indexes matching the full script for paragraphMeta.
+ */
+function chunkForTTS(text, maxLen = MAX_TTS_CHARS) {
+  if (text.length <= maxLen) return [text];
+
+  let pieces = splitPreserving(text, /(\n+)/);
+  pieces = pieces.flatMap(p => p.length <= maxLen ? [p] : splitPreserving(p, /((?<=[.!?])\s+)/));
+  pieces = pieces.flatMap(p => {
+    if (p.length <= maxLen) return [p];
+    const hard = [];
+    for (let i = 0; i < p.length; i += maxLen) hard.push(p.slice(i, i + maxLen));
+    return hard;
+  });
+
+  const chunks = [];
+  let current = '';
+  for (const piece of pieces) {
+    if (current && current.length + piece.length > maxLen) {
+      chunks.push(current);
+      current = piece;
+    } else {
+      current += piece;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function ttsRequest(voiceElevenLabsId, body) {
+  const response = await fetch(`${ELEVENLABS_API_URL}/${voiceElevenLabsId}/with-timestamps`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': process.env.ELEVENLABS_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new GenerationError(err.detail?.message || 'ElevenLabs API error', 'tts_failed', response.status);
+  }
+  return response.json();
+}
+
+/**
+ * Text-to-speech for scripts of any length. Scripts over the per-request cap
+ * are split into paragraph-boundary chunks, generated sequentially with
+ * previous_text/next_text conditioning for prosody continuity, and stitched
+ * back together; chunk alignments are merged (time-offset by cumulative audio
+ * duration) so the result behaves like one /with-timestamps call.
+ *
+ * @returns {Promise<{ audioBuffer: Buffer, alignment: object|null }>}
+ * @throws {GenerationError} code: tts_failed
+ */
+async function synthesizeSpeech(voiceElevenLabsId, text, maxLen = MAX_TTS_CHARS) {
+  const chunks = chunkForTTS(text, maxLen);
+  const buffers = [];
+  const characters = [];
+  const starts = [];
+  const ends = [];
+  let offset = 0;
+  let alignmentOk = true;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const ttsData = await ttsRequest(voiceElevenLabsId, {
+      text: chunks[i],
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      // Conditioning context only (not spoken, not billed) — keeps the voice's
+      // prosody flowing across chunk boundaries.
+      previous_text: i > 0 ? chunks[i - 1].slice(-300) : undefined,
+      next_text: i < chunks.length - 1 ? chunks[i + 1].slice(0, 300) : undefined,
+    });
+    buffers.push(Buffer.from(ttsData.audio_base64, 'base64'));
+
+    const a = ttsData.alignment;
+    if (a?.character_end_times_seconds?.length) {
+      characters.push(...(a.characters || []));
+      starts.push(...a.character_start_times_seconds.map(t => t + offset));
+      ends.push(...a.character_end_times_seconds.map(t => t + offset));
+      // Chunk audio duration ≈ last character end time (trailing silence is
+      // negligible in ElevenLabs output; same assumption as paragraph regen).
+      offset += a.character_end_times_seconds[a.character_end_times_seconds.length - 1];
+    } else {
+      alignmentOk = false;
+    }
+  }
+
+  const audioBuffer = await concatAudioBuffers(buffers);
+  return {
+    audioBuffer,
+    alignment: alignmentOk
+      ? { characters, character_start_times_seconds: starts, character_end_times_seconds: ends }
+      : null,
+  };
+}
+
 /**
  * Full episode generation pipeline, shared by the manual /generate route and
  * the automatic feed poller: pronunciation rules → normalize → character-limit
- * check → single-pass ElevenLabs /with-timestamps call → Supabase upload →
- * draft Episode with paragraphMeta.
+ * check → ElevenLabs /with-timestamps (chunked when over the per-request cap)
+ * → Supabase upload → draft Episode with paragraphMeta.
  *
  * @param {object} params
  * @param {object} params.org   - organization with `subscription` included
@@ -66,36 +172,14 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
 
-  if (processedText.length > MAX_TTS_CHARS) {
-    throw new GenerationError(`Script is too long (${processedText.length} characters, max ${MAX_TTS_CHARS})`, 'script_too_long', 422);
-  }
-
-  // Call ElevenLabs with-timestamps endpoint
-  const response = await fetch(`${ELEVENLABS_API_URL}/${voiceElevenLabsId}/with-timestamps`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': process.env.ELEVENLABS_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      text: processedText,
-      model_id: 'eleven_multilingual_v2',
-      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new GenerationError(err.detail?.message || 'ElevenLabs API error', 'tts_failed', response.status);
-  }
-
-  const ttsData = await response.json();
-  const audioBuffer = Buffer.from(ttsData.audio_base64, 'base64');
+  // Long scripts are chunked across multiple TTS calls and stitched — no upper
+  // length limit here beyond the monthly character cap enforced above.
+  const { audioBuffer, alignment } = await synthesizeSpeech(voiceElevenLabsId, processedText);
 
   let paragraphMeta = null;
-  if (ttsData.alignment) {
+  if (alignment) {
     const paragraphs = splitIntoParagraphs(processedText);
-    paragraphMeta = computeParagraphMeta(processedText, paragraphs, ttsData.alignment);
+    paragraphMeta = computeParagraphMeta(processedText, paragraphs, alignment);
   }
 
   // Upload to Supabase Storage
@@ -360,4 +444,4 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
   });
 }
 
-module.exports = { generateDraftEpisode, generateDigestEpisode, GenerationError, MAX_TTS_CHARS };
+module.exports = { generateDraftEpisode, generateDigestEpisode, synthesizeSpeech, GenerationError, MAX_TTS_CHARS };

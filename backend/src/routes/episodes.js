@@ -8,7 +8,7 @@ const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragrap
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
 const { characterLimitForPlan } = require('../utils/planLimits');
-const { MAX_TTS_CHARS } = require('../services/generateEpisode');
+const { synthesizeSpeech } = require('../services/generateEpisode');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -284,46 +284,24 @@ router.post('/:id/regenerate', async (req, res) => {
 
   const normalizedText = normalizeForTTS(scriptText);
 
-  if (normalizedText.length > MAX_TTS_CHARS) {
-    return res.status(422).json({ error: `Script is too long (${normalizedText.length} characters, max ${MAX_TTS_CHARS})` });
-  }
-
   if (process.env.NODE_ENV !== 'production') {
     console.log('[TTS regenerate] first 200 chars:', normalizedText.slice(0, 200));
   }
 
-  // Call ElevenLabs with-timestamps endpoint so paragraphMeta stays in sync with the new audio
+  // Chunk-aware TTS so paragraphMeta stays in sync with the new audio
   let audioBuffer;
   let paragraphMeta = null;
   try {
-    const response = await fetch(`${ELEVENLABS_API_URL}/${episode.voice.elevenLabsId}/with-timestamps`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: normalizedText,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    });
+    const { audioBuffer: buffer, alignment } = await synthesizeSpeech(episode.voice.elevenLabsId, normalizedText);
+    audioBuffer = buffer;
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: err.detail?.message || 'ElevenLabs API error' });
-    }
-
-    const ttsData = await response.json();
-    audioBuffer = Buffer.from(ttsData.audio_base64, 'base64');
-
-    if (ttsData.alignment) {
+    if (alignment) {
       const paragraphs = splitIntoParagraphs(normalizedText);
-      paragraphMeta = computeParagraphMeta(normalizedText, paragraphs, ttsData.alignment);
+      paragraphMeta = computeParagraphMeta(normalizedText, paragraphs, alignment);
     }
   } catch (err) {
     console.error('ElevenLabs error:', err.message);
-    return res.status(500).json({ error: 'Failed to generate audio' });
+    return res.status(err.status && err.status >= 400 ? err.status : 500).json({ error: err.message || 'Failed to generate audio' });
   }
 
   // Upload new audio — use a timestamped path to bust any CDN cache on the old URL
