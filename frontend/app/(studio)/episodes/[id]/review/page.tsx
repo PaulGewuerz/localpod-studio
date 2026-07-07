@@ -344,30 +344,60 @@ export default function EpisodeReviewPage() {
     }
   }
 
+  // After a dropped /schedule request, poll the episode to see if it was scheduled anyway
+  async function waitForScheduled(token: string, pubdate: string): Promise<boolean> {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await new Promise(r => setTimeout(r, 5_000))
+      try {
+        const res = await fetch(`${API_URL}/episodes/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) continue
+        const data: Episode = await res.json()
+        if (data.scheduledAt && new Date(data.scheduledAt).getTime() === new Date(pubdate).getTime()) {
+          return true
+        }
+      } catch { /* keep polling */ }
+    }
+    return false
+  }
+
   async function handleSchedule() {
     if (!scheduleDate) { setActionError('Please pick a date and time.'); return }
     setScheduling(true)
     setActionError(null)
     const isReschedule = episode!.status === 'scheduled'
+    const pubdate = new Date(scheduleDate).toISOString()
     try {
       const token = await getToken()
-      const res = await fetch(`${API_URL}/schedule`, {
-        method: isReschedule ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          episodeId: id,
-          title: episode!.title,
-          pubdate: new Date(scheduleDate).toISOString(),
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        throw new Error(d.error || `${isReschedule ? 'Reschedule' : 'Schedule'} failed (${res.status})`)
+      try {
+        // Megaphone can take a while to ingest the audio, and a proxy can drop
+        // the connection without the browser noticing — don't hang forever.
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 45_000)
+        const res = await fetch(`${API_URL}/schedule`, {
+          method: isReschedule ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ episodeId: id, title: episode!.title, pubdate }),
+          signal: controller.signal,
+        })
+        clearTimeout(timer)
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}))
+          throw Object.assign(
+            new Error(d.error || `${isReschedule ? 'Reschedule' : 'Schedule'} failed (${res.status})`),
+            { isHttpError: true }
+          )
+        }
+      } catch (err) {
+        if ((err as { isHttpError?: boolean }).isHttpError) throw err
+        // Timed out or connection dropped — the backend may still have finished.
+        const confirmed = await waitForScheduled(token, pubdate)
+        if (!confirmed) {
+          throw new Error('Scheduling is taking longer than expected — check the Episodes page before retrying.')
+        }
       }
-      const data = await res.json()
-      setEpisode(prev => prev ? { ...prev, scheduledAt: data.scheduledFor } : prev)
-      setShowSchedule(false)
-      setScheduleDate('')
+      router.push('/studio?nav=episodes')
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
       setScheduling(false)

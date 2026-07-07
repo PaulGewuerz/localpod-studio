@@ -30,6 +30,9 @@ router.post('/', async (req, res) => {
   if (!episode.audioUrl) {
     return res.status(400).json({ error: 'Episode has no audio — generate audio first' });
   }
+  if (episode.status === 'published') {
+    return res.status(400).json({ error: 'Episode is already published' });
+  }
 
   const megaphoneShowId = episode.show.megaphoneShowId;
   if (!megaphoneShowId) {
@@ -38,6 +41,27 @@ router.post('/', async (req, res) => {
 
   try {
     const adapter = getHostingAdapter();
+
+    // Retry safety: if this episode already exists on Megaphone (e.g. the client
+    // gave up on a slow request and retried), update its pubdate instead of
+    // creating a duplicate Megaphone episode.
+    if (episode.megaphoneEpisodeId) {
+      await adapter.updateEpisode(megaphoneShowId, episode.megaphoneEpisodeId, {
+        title: title || episode.title,
+        pubdate: scheduledAt.toISOString(),
+      });
+      await prisma.episode.update({
+        where: { id: episodeId },
+        data: { status: 'scheduled', scheduledAt },
+      });
+      return res.json({
+        episodeId,
+        megaphoneEpisodeId: episode.megaphoneEpisodeId,
+        publishedUrl: episode.publishedUrl,
+        scheduledFor: scheduledAt.toISOString(),
+      });
+    }
+
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
