@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdMarkersPanel from './AdMarkersPanel'
@@ -64,6 +64,12 @@ export default function EpisodeReviewPage() {
   const [editingOrder, setEditingOrder] = useState<number | null>(null)
   const [editedText, setEditedText] = useState('')
   const [regeneratingOrder, setRegeneratingOrder] = useState<number | null>(null)
+  const [deletingOrder, setDeletingOrder] = useState<number | null>(null)
+
+  // Add-paragraph state — addingAfter is the order to insert after (-1 = before the first)
+  const [addingAfter, setAddingAfter] = useState<number | null>(null)
+  const [newParaText, setNewParaText] = useState('')
+  const [addingParagraph, setAddingParagraph] = useState(false)
 
   // Paragraph take (version) state — keys are `${order}:${takeIndex}`
   const [restoringTake, setRestoringTake] = useState<string | null>(null)
@@ -222,6 +228,59 @@ export default function EpisodeReviewPage() {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setRegeneratingOrder(null)
+    }
+  }
+
+  async function handleDeleteParagraph(order: number) {
+    if (!window.confirm('Delete this paragraph? Its audio will be cut from the episode.')) return
+    setDeletingOrder(order)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/paragraphs/${order}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Delete failed (${res.status})`)
+      }
+      const updated = await res.json()
+      setEpisode(prev => prev ? { ...prev, audioUrl: updated.audioUrl, scriptText: updated.scriptText, status: 'draft' } : prev)
+      setParagraphs(updated.paragraphMeta)
+      setEditingOrder(null)
+      setEditedText('')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setDeletingOrder(null)
+    }
+  }
+
+  async function handleAddParagraph() {
+    if (addingAfter === null || !newParaText.trim()) return
+    setAddingParagraph(true)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/paragraphs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text: newParaText, afterOrder: addingAfter }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Add failed (${res.status})`)
+      }
+      const updated = await res.json()
+      setEpisode(prev => prev ? { ...prev, audioUrl: updated.audioUrl, scriptText: updated.scriptText, status: 'draft' } : prev)
+      setParagraphs(updated.paragraphMeta)
+      setAddingAfter(null)
+      setNewParaText('')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setAddingParagraph(false)
     }
   }
 
@@ -422,6 +481,53 @@ export default function EpisodeReviewPage() {
 
   const hasParagraphs = paragraphs.length > 0
 
+  // Insert point rendered before the first paragraph (-1) and after each one
+  function renderInsertZone(afterOrder: number) {
+    if (addingAfter === afterOrder) {
+      return (
+        <div className="rounded-[2px] border border-[var(--ink)] bg-white p-3">
+          <textarea
+            autoFocus
+            value={newParaText}
+            onChange={e => setNewParaText(e.target.value)}
+            placeholder="New paragraph text"
+            className="w-full text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed resize-y bg-white text-[var(--ink)] focus:outline-none min-h-[80px]"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <button
+              onClick={() => { setAddingAfter(null); setNewParaText('') }}
+              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddParagraph}
+              disabled={addingParagraph || !newParaText.trim()}
+              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+            >
+              {addingParagraph ? (
+                <span className="flex items-center gap-2">
+                  <span className="lp-spin inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
+                  Adding…
+                </span>
+              ) : 'Add paragraph →'}
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <button
+        onClick={() => { setAddingAfter(afterOrder); setNewParaText(''); setActionError(null) }}
+        disabled={editingOrder !== null || regeneratingOrder !== null || addingParagraph || deletingOrder !== null}
+        className="self-center text-[10px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] opacity-50 hover:opacity-100 hover:text-[var(--ink)] disabled:opacity-30 transition-opacity leading-none py-0.5"
+        title="Insert a new paragraph here"
+      >
+        + Add paragraph
+      </button>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg)]">
 
@@ -539,13 +645,14 @@ export default function EpisodeReviewPage() {
             </div>
 
             <div className="flex flex-col gap-2">
+              {renderInsertZone(-1)}
               {paragraphs.map(para => {
                 const isEditing = editingOrder === para.order
                 const isRegenerating = regeneratingOrder === para.order
 
                 return (
+                  <Fragment key={para.order}>
                   <div
-                    key={para.order}
                     className={`rounded-[2px] border transition-colors ${
                       isEditing
                         ? 'border-[var(--ink)] bg-white'
@@ -561,12 +668,22 @@ export default function EpisodeReviewPage() {
                           className="w-full text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed resize-y bg-white text-[var(--ink)] focus:outline-none min-h-[80px]"
                         />
                         <div className="flex items-center justify-between mt-2">
-                          <button
-                            onClick={cancelEditParagraph}
-                            className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
-                          >
-                            Cancel
-                          </button>
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={cancelEditParagraph}
+                              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleDeleteParagraph(para.order)}
+                              disabled={isRegenerating || deletingOrder !== null || paragraphs.length <= 1}
+                              title={paragraphs.length <= 1 ? 'An episode needs at least one paragraph' : 'Remove this paragraph and its audio'}
+                              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] hover:underline disabled:opacity-50 transition-colors"
+                            >
+                              {deletingOrder === para.order ? 'Deleting…' : 'Delete paragraph'}
+                            </button>
+                          </div>
                           <button
                             onClick={() => handleParagraphRegenerate(para.order)}
                             disabled={isRegenerating || !editedText.trim()}
@@ -659,6 +776,8 @@ export default function EpisodeReviewPage() {
                       </>
                     )}
                   </div>
+                  {renderInsertZone(para.order)}
+                  </Fragment>
                 )
               })}
             </div>

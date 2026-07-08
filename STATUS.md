@@ -1,7 +1,7 @@
 # LocalPod Studio — Status & TODO
 
 > Living doc. Update this at the end of every working session.
-> Last updated: 2026-07-07
+> Last updated: 2026-07-08
 
 ---
 
@@ -72,6 +72,8 @@ Still open:
 ---
 
 ## Done (recent, newest first)
+
+- **Add/delete paragraphs on the review page** (2026-07-08) — paragraphs can now be inserted or removed, not just regenerated. New `POST /episodes/:id/paragraphs` (body `{ text, afterOrder }`, `-1` = start) generates TTS for the new text and splices it in at the boundary (zero-length `spliceSegment` window); new `DELETE /episodes/:id/paragraphs/:order` cuts the paragraph's time window out of the audio via `removeSegment` (new in stitchAudio.js). Both renumber `paragraphMeta` orders, shift subsequent timings, rebuild `scriptText` from paragraph texts (also syncing any drift from past per-paragraph regens), and reset status to draft. UI: faint "+ Add paragraph" insert points before/between/after paragraphs (expand to a textarea), "Delete paragraph" (with confirm) in the paragraph editor; deleting the only paragraph is rejected. Notes: neither path updates `characterCount` (same as per-paragraph regen — TTS spend on edits isn't metered); a deleted paragraph's take files stay in storage (no cleanup, consistent with take history).
 
 - **RLS enabled on all public tables** (2026-07-07) — Supabase flagged `rls_disabled_in_public` (critical): every table was readable/writable by anyone with the anon key (verified live — anonymous REST read of `User` returned data). Fix: `ALTER TABLE … ENABLE ROW LEVEL SECURITY` on all 12 public tables (9 Prisma models + `_prisma_migrations` + stray lowercase `shows`/`episodes` leftovers) with **no policies** — backend connects as the table owner, which bypasses RLS, so Prisma is unaffected; the auto-generated REST API is fully locked out (anon reads return `[]`, writes get 42501). Migration `20260707000000_enable_rls` + `scripts/enable-rls.js` (re-runnable; sweeps any public table the migration misses and aborts if a table isn't owned by the connecting role). **Note:** new tables don't inherit RLS — future migrations must include `ENABLE ROW LEVEL SECURITY`, or re-run the script. The stray `shows`/`episodes` tables are candidates for dropping.
 

@@ -104,6 +104,55 @@ async function spliceSegment(fullAudioUrl, newAudioBuffer, timeStart, timeEnd) {
 }
 
 /**
+ * Cut a time-bounded segment out of a full audio file (the inverse of spliceSegment).
+ *
+ * @param {string} fullAudioUrl - public URL of the current full episode audio
+ * @param {number} timeStart    - segment start in seconds
+ * @param {number} timeEnd      - segment end in seconds
+ * @returns {Buffer}            - the full audio with the segment removed
+ */
+async function removeSegment(fullAudioUrl, timeStart, timeEnd) {
+  const tmp = os.tmpdir();
+  const id = `lp_rm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const rawPath    = path.join(tmp, `${id}_raw`);
+  const fullPath   = path.join(tmp, `${id}_full.mp3`);
+  const beforePath = path.join(tmp, `${id}_before.mp3`);
+  const afterPath  = path.join(tmp, `${id}_after.mp3`);
+  const outPath    = path.join(tmp, `${id}_out.mp3`);
+
+  try {
+    await downloadToTemp(fullAudioUrl, rawPath);
+    // Normalise to MP3 so cutSegment can stream-copy cleanly regardless of source format
+    await execAsync(`ffmpeg -y -i "${rawPath}" -acodec libmp3lame -ar 44100 -ab 128k -ac 2 "${fullPath}"`);
+    await fs.unlink(rawPath).catch(() => {});
+
+    const segments = [];
+
+    if (timeStart > 0.05) {
+      await cutSegment(fullPath, beforePath, 0, timeStart);
+      segments.push(beforePath);
+    }
+
+    await cutSegment(fullPath, afterPath, timeEnd);
+    const afterStat = await fs.stat(afterPath).catch(() => null);
+    if (afterStat && afterStat.size > 1000) {
+      segments.push(afterPath);
+    }
+
+    if (segments.length === 0) {
+      throw new Error('Segment spans the entire audio — nothing would remain');
+    }
+
+    await concatSegments(segments, outPath);
+    return await fs.readFile(outPath);
+  } finally {
+    await Promise.all([rawPath, fullPath, beforePath, afterPath, outPath]
+      .map(p => fs.unlink(p).catch(() => {})));
+  }
+}
+
+/**
  * Concatenate audio buffers into one MP3 (re-encoded for clean frame boundaries).
  * @param {Buffer[]} buffers - ordered audio buffers
  * @returns {Buffer}
@@ -231,4 +280,4 @@ async function stitchCampaigns(episodeAudioUrl, assignments, campaignAudioUrls) 
   }
 }
 
-module.exports = { spliceSegment, extractSegment, stitchCampaigns, concatAudioBuffers };
+module.exports = { spliceSegment, extractSegment, removeSegment, stitchCampaigns, concatAudioBuffers };

@@ -3,7 +3,7 @@ const router = express.Router();
 const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
 const { normalizeForTTS } = require('../utils/normalizeText');
-const { spliceSegment, extractSegment } = require('../utils/stitchAudio');
+const { spliceSegment, extractSegment, removeSegment } = require('../utils/stitchAudio');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
@@ -574,6 +574,192 @@ router.post('/:id/paragraphs/:order/takes/:takeIndex/restore', async (req, res) 
   });
 
   res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs });
+});
+
+// POST /episodes/:id/paragraphs — generate audio for a new paragraph and splice it in
+// Body: { text, afterOrder } — afterOrder of -1 inserts at the start
+router.post('/:id/paragraphs', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+  const { text, afterOrder: afterOrderRaw } = req.body;
+  const afterOrder = parseInt(afterOrderRaw, 10);
+
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+  if (isNaN(afterOrder)) return res.status(400).json({ error: 'afterOrder must be a number (-1 inserts at the start)' });
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true, voice: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+  if (!episode.voice) {
+    return res.status(400).json({ error: 'Episode has no voice — cannot generate audio' });
+  }
+  if (!episode.audioUrl) {
+    return res.status(400).json({ error: 'Episode has no audio' });
+  }
+  if (!episode.paragraphMeta) {
+    return res.status(400).json({ error: 'Episode has no paragraph metadata — regenerate the full episode first' });
+  }
+
+  const paragraphs = JSON.parse(episode.paragraphMeta).sort((a, b) => a.order - b.order);
+  const anchor = afterOrder === -1 ? null : paragraphs.find(p => p.order === afterOrder);
+  if (afterOrder !== -1 && !anchor) {
+    return res.status(404).json({ error: `Paragraph ${afterOrder} not found` });
+  }
+
+  const normalizedText = normalizeForTTS(text);
+
+  // Generate audio for just the new paragraph
+  let newAudioBuffer;
+  let newDuration;
+  try {
+    const response = await fetch(`${ELEVENLABS_API_URL}/${episode.voice.elevenLabsId}/with-timestamps`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: normalizedText,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: err.detail?.message || 'ElevenLabs API error' });
+    }
+    const ttsData = await response.json();
+    newAudioBuffer = Buffer.from(ttsData.audio_base64, 'base64');
+    const ends = ttsData.alignment?.character_end_times_seconds;
+    if (!ends?.length) {
+      return res.status(500).json({ error: 'ElevenLabs returned no timing data for the new paragraph' });
+    }
+    newDuration = ends[ends.length - 1];
+  } catch (err) {
+    console.error('ElevenLabs error:', err.message);
+    return res.status(500).json({ error: 'Failed to generate audio for paragraph' });
+  }
+
+  // Stitch: insert the new audio at the boundary (zero-length splice window)
+  const insertTime = anchor ? anchor.timeEnd : 0;
+  let stitchedBuffer;
+  try {
+    stitchedBuffer = await spliceSegment(episode.audioUrl, newAudioBuffer, insertTime, insertTime);
+  } catch (err) {
+    console.error('Stitch error:', err.message);
+    return res.status(500).json({ error: 'Audio stitching failed — is ffmpeg installed?' });
+  }
+
+  const storagePath = `${orgId}/${id}_${Date.now()}.mp3`;
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(AUDIO_BUCKET)
+    .upload(storagePath, stitchedBuffer, { contentType: 'audio/mpeg' });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError.message);
+    return res.status(500).json({ error: 'Failed to store stitched audio' });
+  }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(storagePath);
+
+  // Insert into paragraph metadata: renumber and shift everything after the new paragraph
+  const updatedParagraphs = [
+    ...paragraphs.filter(p => p.order <= afterOrder),
+    { order: afterOrder + 1, text, timeStart: insertTime, timeEnd: insertTime + newDuration },
+    ...paragraphs
+      .filter(p => p.order > afterOrder)
+      .map(p => ({ ...p, order: p.order + 1, timeStart: p.timeStart + newDuration, timeEnd: p.timeEnd + newDuration })),
+  ];
+  const scriptText = updatedParagraphs.map(p => p.text).join('\n\n');
+
+  await prisma.episode.update({
+    where: { id },
+    data: {
+      audioUrl: publicUrl,
+      scriptText,
+      paragraphMeta: JSON.stringify(updatedParagraphs),
+      status: 'draft',
+    },
+  });
+
+  res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs, scriptText });
+});
+
+// DELETE /episodes/:id/paragraphs/:order — cut a paragraph out of the audio and script
+router.delete('/:id/paragraphs/:order', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id, order: orderStr } = req.params;
+  const order = parseInt(orderStr, 10);
+
+  if (isNaN(order)) return res.status(400).json({ error: 'order must be a number' });
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+  if (!episode.audioUrl) {
+    return res.status(400).json({ error: 'Episode has no audio' });
+  }
+  if (!episode.paragraphMeta) {
+    return res.status(400).json({ error: 'Episode has no paragraph metadata' });
+  }
+
+  const paragraphs = JSON.parse(episode.paragraphMeta).sort((a, b) => a.order - b.order);
+  const para = paragraphs.find(p => p.order === order);
+  if (!para) return res.status(404).json({ error: `Paragraph ${order} not found` });
+  if (paragraphs.length <= 1) {
+    return res.status(400).json({ error: 'Cannot delete the only paragraph — delete the episode instead' });
+  }
+
+  let stitchedBuffer;
+  try {
+    stitchedBuffer = await removeSegment(episode.audioUrl, para.timeStart, para.timeEnd);
+  } catch (err) {
+    console.error('Stitch error:', err.message);
+    return res.status(500).json({ error: 'Audio stitching failed — is ffmpeg installed?' });
+  }
+
+  const storagePath = `${orgId}/${id}_${Date.now()}.mp3`;
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(AUDIO_BUCKET)
+    .upload(storagePath, stitchedBuffer, { contentType: 'audio/mpeg' });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError.message);
+    return res.status(500).json({ error: 'Failed to store stitched audio' });
+  }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from(AUDIO_BUCKET).getPublicUrl(storagePath);
+
+  // Remove from paragraph metadata: renumber and shift everything after the deleted paragraph
+  const removedDuration = para.timeEnd - para.timeStart;
+  const updatedParagraphs = paragraphs
+    .filter(p => p.order !== order)
+    .map(p => p.order > order
+      ? { ...p, order: p.order - 1, timeStart: p.timeStart - removedDuration, timeEnd: p.timeEnd - removedDuration }
+      : p);
+  const scriptText = updatedParagraphs.map(p => p.text).join('\n\n');
+
+  await prisma.episode.update({
+    where: { id },
+    data: {
+      audioUrl: publicUrl,
+      scriptText,
+      paragraphMeta: JSON.stringify(updatedParagraphs),
+      status: 'draft',
+    },
+  });
+
+  res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs, scriptText });
 });
 
 // PATCH /episodes/:id/ad-assignments — save which publisher campaigns to stitch at publish time
