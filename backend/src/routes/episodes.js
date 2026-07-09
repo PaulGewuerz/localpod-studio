@@ -13,6 +13,25 @@ const { synthesizeSpeech } = require('../services/generateEpisode');
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
 
+// A scheduled episode already exists on Megaphone with its audio ingested at
+// schedule time, and Megaphone updates can't replace ingested audio. Once the
+// local audio changes, that Megaphone episode is stale — left alone it goes
+// live at its pubdate with the OLD audio. Delete it (best-effort) and return
+// the episode fields to clear so the next publish/schedule re-ingests fresh.
+// Episodes already published are left untouched.
+async function discardStaleMegaphoneEpisode(episode) {
+  if (!episode.megaphoneEpisodeId || episode.status === 'published') return {};
+  if (episode.show?.megaphoneShowId) {
+    try {
+      const adapter = getHostingAdapter();
+      await adapter.deleteEpisode(episode.show.megaphoneShowId, episode.megaphoneEpisodeId);
+    } catch (err) {
+      console.warn('Stale Megaphone episode delete failed (continuing):', err.message);
+    }
+  }
+  return { megaphoneEpisodeId: null, publishedUrl: null, scheduledAt: null };
+}
+
 router.get('/usage', async (req, res) => {
   const orgId = req.user.organization.id;
   const now = new Date();
@@ -180,6 +199,18 @@ router.patch('/:id/approve', async (req, res) => {
 
   try {
     const adapter = getHostingAdapter();
+
+    // A leftover Megaphone episode from an earlier scheduling still holds the
+    // audio ingested back then. If it isn't removed before we publish a fresh
+    // one, it stays scheduled on Megaphone and goes live with the old audio.
+    if (episode.megaphoneEpisodeId) {
+      try {
+        await adapter.deleteEpisode(megaphoneShowId, episode.megaphoneEpisodeId);
+      } catch (err) {
+        console.warn('Stale Megaphone episode delete failed (continuing):', err.message);
+      }
+    }
+
     // Don't send Megaphone DAI slots when local stitching is in use — the ad is
     // already baked into the audio. Sending postCount/preCount on a podcast that
     // doesn't have DAI enabled causes Megaphone to get stuck in "processing".
@@ -325,6 +356,7 @@ router.post('/:id/regenerate', async (req, res) => {
       characterCount: normalizedText.length,
       paragraphMeta: paragraphMeta ? JSON.stringify(paragraphMeta) : null,
       status: 'draft',
+      ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
@@ -477,6 +509,7 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
       audioUrl: publicUrl,
       paragraphMeta: JSON.stringify(updatedParagraphs),
       status: 'draft',
+      ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
@@ -570,6 +603,7 @@ router.post('/:id/paragraphs/:order/takes/:takeIndex/restore', async (req, res) 
       audioUrl: publicUrl,
       paragraphMeta: JSON.stringify(updatedParagraphs),
       status: 'draft',
+      ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
@@ -684,6 +718,7 @@ router.post('/:id/paragraphs', async (req, res) => {
       scriptText,
       paragraphMeta: JSON.stringify(updatedParagraphs),
       status: 'draft',
+      ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
@@ -756,6 +791,7 @@ router.delete('/:id/paragraphs/:order', async (req, res) => {
       scriptText,
       paragraphMeta: JSON.stringify(updatedParagraphs),
       status: 'draft',
+      ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 

@@ -42,24 +42,16 @@ router.post('/', async (req, res) => {
   try {
     const adapter = getHostingAdapter();
 
-    // Retry safety: if this episode already exists on Megaphone (e.g. the client
-    // gave up on a slow request and retried), update its pubdate instead of
-    // creating a duplicate Megaphone episode.
+    // If this episode already exists on Megaphone (a client retry after a slow
+    // request, or an earlier scheduling), delete it and recreate below instead
+    // of updating in place: Megaphone can't replace ingested audio via update,
+    // so an in-place update would keep — and publish — the old audio.
     if (episode.megaphoneEpisodeId) {
-      await adapter.updateEpisode(megaphoneShowId, episode.megaphoneEpisodeId, {
-        title: title || episode.title,
-        pubdate: scheduledAt.toISOString(),
-      });
-      await prisma.episode.update({
-        where: { id: episodeId },
-        data: { status: 'scheduled', scheduledAt },
-      });
-      return res.json({
-        episodeId,
-        megaphoneEpisodeId: episode.megaphoneEpisodeId,
-        publishedUrl: episode.publishedUrl,
-        scheduledFor: scheduledAt.toISOString(),
-      });
+      try {
+        await adapter.deleteEpisode(megaphoneShowId, episode.megaphoneEpisodeId);
+      } catch (err) {
+        console.warn('Stale Megaphone episode delete failed (continuing):', err.message);
+      }
     }
 
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
