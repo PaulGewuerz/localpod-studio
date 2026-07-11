@@ -147,14 +147,30 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Episode Table ─────────────────────────────────────────────────────────────
 
-function EpisodeTable({ episodes, onNew, onDelete }: {
+function EpisodeTable({ episodes, onNew, onDelete, onUnschedule }: {
   episodes: Episode[]
   onNew?: () => void
   onDelete?: (ids: string[]) => Promise<void>
+  onUnschedule?: (id: string) => Promise<void>
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [unschedulingId, setUnschedulingId] = useState<string | null>(null)
+
+  async function handleUnschedule(id: string) {
+    if (!onUnschedule) return
+    if (!window.confirm('Unschedule this episode? It goes back to your drafts and is removed from the feed schedule until you publish or schedule it again.')) return
+    setUnschedulingId(id)
+    setDeleteError(null)
+    try {
+      await onUnschedule(id)
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Unschedule failed')
+    } finally {
+      setUnschedulingId(null)
+    }
+  }
 
   const allSelected = episodes.length > 0 && selected.size === episodes.length
 
@@ -270,6 +286,15 @@ function EpisodeTable({ episodes, onNew, onDelete }: {
               </td>
               <td className="px-4 py-3 border-b border-[var(--rule)]">
                 <div className="flex items-center gap-3">
+                  {onUnschedule && ep.status === 'scheduled' && ep.source !== 'megaphone' && (
+                    <button
+                      onClick={() => handleUnschedule(ep.id)}
+                      disabled={unschedulingId !== null}
+                      className="text-[12px] text-[var(--ink-faint)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
+                    >
+                      {unschedulingId === ep.id ? 'Unscheduling…' : 'Unschedule'}
+                    </button>
+                  )}
                   {(ep.status === 'published' || ep.status === 'scheduled') && ep.publishedUrl && (
                     <a
                       href={ep.publishedUrl}
@@ -735,6 +760,19 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     ))
     const failed = results.filter(r => !r.ok)
     if (failed.length) throw new Error(`Failed to delete ${failed.length} episode(s)`)
+    setEpisodeRefreshKey(k => k + 1)
+  }
+
+  async function handleUnscheduleEpisode(id: string) {
+    const token = await getToken()
+    const res = await fetch(`${API_URL}/episodes/${id}/unschedule`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.error || `Unschedule failed (${res.status})`)
+    }
     setEpisodeRefreshKey(k => k + 1)
   }
 
@@ -1301,7 +1339,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               </div>
               {loadingEpisodes
                 ? <p className="text-[var(--ink-faint)] text-sm font-[family-name:var(--font-dm-mono)]">Loading…</p>
-                : <EpisodeTable episodes={episodes.slice(0, 5)} onNew={() => { setActiveNav('new'); resetNewEpisode() }} />
+                : <EpisodeTable episodes={episodes.slice(0, 5)} onNew={() => { setActiveNav('new'); resetNewEpisode() }} onUnschedule={handleUnscheduleEpisode} />
               }
             </div>
           )}
@@ -1317,7 +1355,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               </div>
               {loadingEpisodes
                 ? <p className="text-[var(--ink-faint)] text-sm font-[family-name:var(--font-dm-mono)]">Loading…</p>
-                : <EpisodeTable episodes={episodes} onNew={() => { setActiveNav('new'); resetNewEpisode() }} onDelete={handleDeleteEpisodes} />
+                : <EpisodeTable episodes={episodes} onNew={() => { setActiveNav('new'); resetNewEpisode() }} onDelete={handleDeleteEpisodes} onUnschedule={handleUnscheduleEpisode} />
               }
             </div>
           )}

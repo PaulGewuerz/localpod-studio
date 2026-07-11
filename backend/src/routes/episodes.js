@@ -243,6 +243,55 @@ router.patch('/:id/approve', async (req, res) => {
   }
 });
 
+// POST /episodes/:id/unschedule — revert a scheduled episode to draft.
+// Scheduling creates a real Megaphone episode with the audio already ingested,
+// so it must be deleted there too — flipping the local status alone would leave
+// it to publish at its pubdate anyway. The Megaphone delete is strict (not
+// best-effort) for the same reason; only a 404 (already gone) is tolerated.
+router.post('/:id/unschedule', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+  if (episode.status !== 'scheduled') {
+    return res.status(400).json({ error: 'Episode is not scheduled' });
+  }
+  if (episode.scheduledAt && new Date(episode.scheduledAt) <= new Date()) {
+    return res.status(400).json({ error: 'This episode\'s publish time has already passed — it is live and can no longer be unscheduled' });
+  }
+
+  if (episode.megaphoneEpisodeId && episode.show.megaphoneShowId) {
+    try {
+      const adapter = getHostingAdapter();
+      await adapter.deleteEpisode(episode.show.megaphoneShowId, episode.megaphoneEpisodeId);
+    } catch (err) {
+      if (err.status !== 404) {
+        console.error('Unschedule: Megaphone delete failed:', err.message);
+        return res.status(502).json({ error: `Could not remove the episode from the publishing schedule: ${err.message}. It is still scheduled — please retry.` });
+      }
+    }
+  }
+
+  const updated = await prisma.episode.update({
+    where: { id },
+    data: {
+      status: 'draft',
+      megaphoneEpisodeId: null,
+      publishedUrl: null,
+      scheduledAt: null,
+    },
+  });
+
+  res.json({ episodeId: updated.id, status: updated.status });
+});
+
 // DELETE /episodes/:id
 router.delete('/:id', async (req, res) => {
   const orgId = req.user.organization.id;

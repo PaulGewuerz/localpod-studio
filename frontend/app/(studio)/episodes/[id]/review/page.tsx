@@ -95,6 +95,7 @@ export default function EpisodeReviewPage() {
 
   const [approving, setApproving] = useState(false)
   const [scheduling, setScheduling] = useState(false)
+  const [unscheduling, setUnscheduling] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleDate, setScheduleDate] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
@@ -400,6 +401,30 @@ export default function EpisodeReviewPage() {
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
       setApproving(false)
+    }
+  }
+
+  async function handleUnschedule() {
+    if (!window.confirm('Unschedule this episode? It goes back to your drafts and is removed from the feed schedule until you publish or schedule it again.')) return
+    setUnscheduling(true)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/unschedule`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Unschedule failed (${res.status})`)
+      }
+      setEpisode(prev => prev ? { ...prev, status: 'draft', scheduledAt: null, megaphoneEpisodeId: null } : prev)
+      setShowSchedule(false)
+      setScheduleDate('')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setUnscheduling(false)
     }
   }
 
@@ -887,9 +912,18 @@ export default function EpisodeReviewPage() {
                 onClick={() => router.push('/studio?nav=episodes')}
                 className="px-4 py-2 text-[13px] font-semibold text-[var(--ink-faint)] border border-[var(--rule)] rounded-[2px] hover:text-[var(--ink)] hover:border-[var(--ink-light)] transition-colors"
               >
-                Save as Draft
+                ← Back to Episodes
               </button>
               <div className="flex items-center gap-3">
+                {episode.status === 'scheduled' && (
+                  <button
+                    onClick={handleUnschedule}
+                    disabled={unscheduling}
+                    className="px-4 py-2 text-[13px] font-semibold text-[var(--ink-light)] border border-[var(--rule)] rounded-[2px] hover:text-[var(--ink)] hover:border-[var(--ink-light)] disabled:opacity-50 transition-colors"
+                  >
+                    {unscheduling ? 'Unscheduling…' : 'Unschedule'}
+                  </button>
+                )}
                 <button
                   disabled={episode.status === 'published'}
                   onClick={() => {
