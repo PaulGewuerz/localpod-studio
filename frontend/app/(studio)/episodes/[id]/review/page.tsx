@@ -845,6 +845,7 @@ export default function EpisodeReviewPage() {
           audioUrl={episode.audioUrl}
           episodeId={episode.id}
           isPublished={episode.status === 'published'}
+          isScheduled={episode.status === 'scheduled'}
           initialMarkers={null}
           initialAssignments={episode.adAssignments ? JSON.parse(episode.adAssignments) : []}
           getToken={getToken}

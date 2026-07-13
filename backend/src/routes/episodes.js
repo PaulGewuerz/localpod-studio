@@ -869,6 +869,56 @@ router.patch('/:id/ad-assignments', async (req, res) => {
     : [];
 
   await prisma.episode.update({ where: { id }, data: { adAssignments: JSON.stringify(normalized) } });
+
+  // A scheduled episode already exists on Megaphone with its audio ingested at
+  // schedule time, and Megaphone can't replace ingested audio — re-create it
+  // with freshly stitched audio at the same pubdate so the saved ads are
+  // actually in what publishes.
+  if (
+    episode.status === 'scheduled' &&
+    episode.megaphoneEpisodeId &&
+    episode.show.megaphoneShowId &&
+    episode.scheduledAt && new Date(episode.scheduledAt) > new Date()
+  ) {
+    const adapter = getHostingAdapter();
+
+    try {
+      await adapter.deleteEpisode(episode.show.megaphoneShowId, episode.megaphoneEpisodeId);
+    } catch (err) {
+      if (err.status !== 404) {
+        console.error('Scheduled ad re-sync: Megaphone delete failed:', err.message);
+        return res.status(502).json({ error: `Ad selection saved, but the scheduled episode could not be updated on Megaphone: ${err.message}. It is still scheduled with its previous audio — please retry.` });
+      }
+    }
+
+    try {
+      const fresh = { ...episode, adAssignments: JSON.stringify(normalized) };
+      const hasLocalStitching = normalized.length > 0;
+      const adMarkers = (!hasLocalStitching && episode.adMarkers) ? JSON.parse(episode.adMarkers) : null;
+      const audioUrl = await preparePublishAudio(fresh, orgId, prisma);
+      const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
+        episode.show.megaphoneShowId,
+        {
+          title: episode.title,
+          description: episode.description || '',
+          audioUrl,
+          pubdate: new Date(episode.scheduledAt).toISOString(),
+          adMarkers,
+        }
+      );
+      await prisma.episode.update({ where: { id }, data: { megaphoneEpisodeId, publishedUrl } });
+    } catch (err) {
+      // The old Megaphone episode is gone and the new one didn't make it —
+      // don't pretend it's still scheduled; nothing would publish.
+      console.error('Scheduled ad re-sync: Megaphone re-create failed:', err.message);
+      await prisma.episode.update({
+        where: { id },
+        data: { status: 'draft', megaphoneEpisodeId: null, publishedUrl: null, scheduledAt: null },
+      });
+      return res.status(502).json({ error: `Ad selection saved, but re-scheduling on Megaphone failed: ${err.message}. The episode was returned to drafts — please schedule it again.` });
+    }
+  }
+
   res.json({ episodeId: id, assignments: normalized });
 });
 
@@ -895,8 +945,13 @@ router.patch('/:id/ad-markers', async (req, res) => {
 
   await prisma.episode.update({ where: { id }, data: { adMarkers: JSON.stringify(markers) } });
 
-  // If published, sync to Megaphone immediately
-  if (episode.megaphoneEpisodeId) {
+  // If on Megaphone already, sync the DAI slots — but never when local
+  // stitching is in use: the ad is baked into the audio, and DAI slots on a
+  // podcast without DAI enabled wedge Megaphone in "processing" (same rule as
+  // the approve route).
+  let hasLocalStitching = false;
+  try { hasLocalStitching = JSON.parse(episode.adAssignments || '[]').length > 0; } catch { /* treat as none */ }
+  if (episode.megaphoneEpisodeId && !hasLocalStitching) {
     const megaphoneShowId = episode.show.megaphoneShowId;
     if (megaphoneShowId) {
       try {

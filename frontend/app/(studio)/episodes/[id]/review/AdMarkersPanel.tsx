@@ -25,6 +25,7 @@ interface Props {
   audioUrl: string | null
   episodeId: string
   isPublished: boolean
+  isScheduled?: boolean
   initialMarkers: { preRoll: boolean; postRoll: boolean; midRoll: number[] } | null
   initialAssignments: Omit<AdAssignment, 'id'>[]
   getToken: () => Promise<string>
@@ -59,7 +60,7 @@ function makeId() {
   return Math.random().toString(36).slice(2)
 }
 
-export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initialAssignments, getToken }: Props) {
+export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isScheduled, initialAssignments, getToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wsRef = useRef<any>(null)
@@ -444,7 +445,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, initi
                 disabled={saving}
                 className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
               >
-                {saving ? 'Saving…' : isPublished ? 'Save & sync →' : 'Save'}
+                {saving ? 'Saving…' : (isPublished || isScheduled) ? 'Save & sync →' : 'Save'}
               </button>
               {hasAnyAssigned && (
                 <button

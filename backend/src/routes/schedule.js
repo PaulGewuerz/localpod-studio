@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { getHostingAdapter } = require('../adapters/hosting');
+const { preparePublishAudio } = require('../utils/preparePublishAudio');
 
 router.post('/', async (req, res) => {
   const { episodeId, title, description, pubdate } = req.body;
@@ -54,13 +55,22 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Same audio handling as approve: stitch assigned ad campaigns into the
+    // audio before Megaphone ingests it, and only send DAI slots when local
+    // stitching is NOT in use (DAI slots on a non-DAI podcast wedge Megaphone
+    // in "processing").
+    const hasLocalStitching = !!episode.adAssignments;
+    const adMarkers = (!hasLocalStitching && episode.adMarkers) ? JSON.parse(episode.adMarkers) : null;
+    const audioUrl = await preparePublishAudio(episode, orgId, prisma);
+
     const { id: megaphoneEpisodeId, url: publishedUrl } = await adapter.publishEpisode(
       megaphoneShowId,
       {
         title: title || episode.title,
         description: description || episode.description || '',
-        audioUrl: episode.audioUrl,
+        audioUrl,
         pubdate: scheduledAt.toISOString(),
+        adMarkers,
       }
     );
 
