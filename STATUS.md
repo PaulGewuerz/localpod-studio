@@ -68,10 +68,13 @@ Still open:
 - [ ] **Megaphone legacy campaign API sunsets July 14, 2026** — any DAI work must target v2 before then
 - [ ] Decide fate of untracked working-tree files: `backend/test-output-*.mp3`, `backend/scripts/debug-show.js`, `frontend/netlify.toml`, `landing/generating-screenshot.html` (gitignore, commit, or delete)
 - [ ] Voice roster update in `backend/prisma/seed.js` (9 voices) — uncommitted; needs commit + seed run against Supabase to take effect
+- [ ] **Self-hosted podcast hosting (backlog, not scheduled)** — replace Megaphone with our own RSS feeds + R2 audio delivery; drops $99/mo, kills the OP3 manual-prefix step, eliminates the `ec74672` bug class. Full plan in [hosting.md](hosting.md). Prereq before any migration: the `ec74672` wrong-audio cleanup.
 
 ---
 
 ## Done (recent, newest first)
+
+- **Scheduled episodes: ads now stitched at schedule time + ad saves re-sync Megaphone** (2026-07-13, `6d8c15a`) — `POST /schedule` sent raw `episode.audioUrl` to Megaphone (only approve ran `preparePublishAudio`), so scheduled episodes never had assigned ads in the ingested audio; the ad panel's Save only wrote JSON (the studio "updated audio" is a local preview). Fix: schedule now stitches + applies approve's DAI guard; saving ad-assignments on a scheduled episode (future pubdate) deletes + re-creates the Megaphone episode with freshly stitched audio at the same pubdate (delete-failure → still scheduled, retry; re-create-failure → back to drafts, not silently unscheduled); ad-markers no longer pushes DAI slots when local stitching is in use; panel button says "Save & sync" for scheduled too. Verified live on "Optional County Road and Bridge Fee" (user confirmed correct audio in Megaphone).
 
 - **Unschedule: scheduled episodes can be reverted to draft** (2026-07-11) — previously the only ways out of `scheduled` were reschedule, publish-now, or delete; the review page's "Save as Draft" button was just a back-link (customer confusion). New `POST /episodes/:id/unschedule`: deletes the Megaphone episode (strict — only 404 tolerated; flipping local status alone would leave stale audio to publish at pubdate), clears `megaphoneEpisodeId`/`publishedUrl`/`scheduledAt`, sets draft; rejects if the pubdate already passed. UI: "Unschedule" button on the review page (scheduled episodes only) + per-row "Unschedule" action on the Episodes table (both dashboard and All Episodes); "Save as Draft" renamed "← Back to Episodes".
 
