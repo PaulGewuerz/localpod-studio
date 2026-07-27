@@ -37,6 +37,21 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+type WindowStatus = 'active' | 'expired' | 'scheduled'
+
+// A campaign is only stitched into the audio when "now" falls inside its date
+// window (see backend preparePublishAudio.js). Out-of-window campaigns are
+// silently dropped at publish, so we surface their status in the picker and
+// block saving them onto an episode.
+function campaignWindowStatus(
+  c: { startDate: string | null; endDate: string | null },
+  now = Date.now(),
+): WindowStatus {
+  if (c.startDate && new Date(c.startDate).getTime() > now) return 'scheduled'
+  if (c.endDate && new Date(c.endDate).getTime() < now) return 'expired'
+  return 'active'
+}
+
 const AD_TYPES = [
   { value: 'pre-roll', label: 'Pre' },
   { value: 'mid-roll', label: 'Mid' },
@@ -85,6 +100,18 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
 
   const hasMidRollAssigned = assignments.some(a => a.type === 'mid-roll')
   const hasAnyAssigned = assignments.length > 0
+
+  // Assigned campaigns whose date window doesn't include "now" — publish would
+  // silently drop these, so block save/preview until they're fixed or removed.
+  function outOfWindowError(): string | null {
+    const now = Date.now()
+    const assignedIds = new Set(assignments.map(a => a.campaignId))
+    const stale = campaigns.filter(c => assignedIds.has(c.id) && campaignWindowStatus(c, now) !== 'active')
+    if (stale.length === 0) return null
+    const names = stale.map(c => `"${c.name}"`).join(', ')
+    const plural = stale.length > 1
+    return `${names} ${plural ? 'are' : 'is'} outside ${plural ? 'their' : 'its'} date window and won't be inserted. Update the dates in Ad Manager or remove ${plural ? 'them' : 'it'}.`
+  }
 
   useEffect(() => {
     if (!containerRef.current || !audioUrl) return
@@ -145,12 +172,8 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
           const defaults = me.show?.adMarkerDefaults ? JSON.parse(me.show.adMarkerDefaults) : null
           if (defaults) {
             const auto: AdAssignment[] = []
-            const now = Date.now()
             for (const c of active) {
-              const inWindow =
-                (!c.startDate || new Date(c.startDate).getTime() <= now) &&
-                (!c.endDate || new Date(c.endDate).getTime() >= now)
-              if (!inWindow) continue
+              if (campaignWindowStatus(c) !== 'active') continue
               if (c.type === 'pre-roll' && defaults.preRoll)
                 auto.push({ id: makeId(), campaignId: c.id, type: 'pre-roll' })
               else if (c.type === 'post-roll' && defaults.postRoll)
@@ -208,6 +231,11 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
       setPreviewError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
       return
     }
+    const windowErr = outOfWindowError()
+    if (windowErr) {
+      setPreviewError(windowErr)
+      return
+    }
     setPreviewing(true)
     setPreviewUrl(null)
     setPreviewError(null)
@@ -256,6 +284,12 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
     const unmarkedMidRoll = assignments.find(a => a.type === 'mid-roll' && a.insertAt == null)
     if (unmarkedMidRoll) {
       setSaveError('Set a position for each mid-roll by scrubbing to the right spot and clicking "Mark here".')
+      setSaving(false)
+      return
+    }
+    const windowErr = outOfWindowError()
+    if (windowErr) {
+      setSaveError(windowErr)
       setSaving(false)
       return
     }
@@ -367,6 +401,7 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
             {activeCampaigns.map(c => {
               const campaignPlacements = assignments.filter(a => a.campaignId === c.id)
               const checked = campaignPlacements.length > 0
+              const windowStatus = campaignWindowStatus(c)
 
               return (
                 <div key={c.id} className="rounded-[2px] border border-[var(--rule)] p-3 space-y-2">
@@ -379,6 +414,11 @@ export default function AdMarkersPanel({ audioUrl, episodeId, isPublished, isSch
                         className="w-3.5 h-3.5 accent-[var(--ink)] shrink-0"
                       />
                       <span className="text-[13px] text-[var(--ink)] font-medium">{c.name}</span>
+                      {windowStatus !== 'active' && (
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.04em] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] border border-[var(--accent)] rounded-[2px] px-1 py-0.5 leading-none">
+                          {windowStatus === 'expired' ? 'Expired' : 'Not yet active'}
+                        </span>
+                      )}
                     </label>
                     {checked && (
                       <button
