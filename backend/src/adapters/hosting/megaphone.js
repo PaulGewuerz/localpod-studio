@@ -158,30 +158,53 @@ class MegaphoneAdapter {
 
   /**
    * Publish a new episode to a podcast.
+   *
+   * Megaphone rejects episode-create when a backgroundAudioFileUrl is included
+   * and any earlier upload on the account is still processing ("A previously
+   * uploaded file is still processing. Please try again shortly."). That block
+   * became persistent account-wide around the July 2026 legacy-API sunset and
+   * stopped all publishing. Attaching the audio via a follow-up update instead
+   * of at create time dodges the block — Megaphone still ingests asynchronously
+   * and publishes the episode once the audio is ready, exactly as a
+   * create-with-audio call used to (verified: no polling needed).
+   *
    * @param {string} podcastId - The Megaphone podcast ID (stored as org.megaphoneShowId)
    * @param {{ title: string, description?: string, audioUrl: string, pubdate?: string }} episode
    * @returns {{ id: string, url: string }}
    */
   async publishEpisode(podcastId, { title, description, audioUrl, pubdate, adMarkers }) {
-    const body = {
+    const when = pubdate || new Date().toISOString();
+    const base = `${this.#podcastPath(podcastId)}/episodes`;
+
+    // Step 1: create metadata-only (no audio) so the create isn't blocked.
+    const created = await this.#request('POST', base, {
       title,
       summary: description || '',
+      pubdate: when,
+      draft: true,
+    });
+
+    // Step 2: attach the audio and publish in one update.
+    const update = {
       backgroundAudioFileUrl: audioUrl,
-      pubdate: pubdate || new Date().toISOString(),
+      pubdate: when,
       draft: false,
     };
     if (adMarkers) {
-      body.preCount = adMarkers.preRoll ? 1 : 0;
-      body.postCount = adMarkers.postRoll ? 1 : 0;
-      if (adMarkers.midRoll?.length) body.insertionPoints = adMarkers.midRoll;
+      update.preCount = adMarkers.preRoll ? 1 : 0;
+      update.postCount = adMarkers.postRoll ? 1 : 0;
+      if (adMarkers.midRoll?.length) update.insertionPoints = adMarkers.midRoll;
     }
-    const data = await this.#request(
-      'POST',
-      `${this.#podcastPath(podcastId)}/episodes`,
-      body
-    );
-    const playerUrl = data.uid ? `https://playlist.megaphone.fm?e=${data.uid}` : null;
-    return { id: data.id, url: playerUrl };
+    try {
+      await this.#request('PUT', `${base}/${created.id}`, update);
+    } catch (err) {
+      // Don't leave an orphaned empty draft behind if attaching audio failed.
+      try { await this.#request('DELETE', `${base}/${created.id}`); } catch { /* best effort */ }
+      throw err;
+    }
+
+    const playerUrl = created.uid ? `https://playlist.megaphone.fm?e=${created.uid}` : null;
+    return { id: created.id, url: playerUrl };
   }
 
   /**
