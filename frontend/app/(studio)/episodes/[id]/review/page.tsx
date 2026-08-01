@@ -111,6 +111,7 @@ export default function EpisodeReviewPage() {
   const [approving, setApproving] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [unscheduling, setUnscheduling] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleDate, setScheduleDate] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
@@ -467,6 +468,26 @@ export default function EpisodeReviewPage() {
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
       setApproving(false)
+    }
+  }
+
+  async function handleSaveDraft() {
+    setSavingDraft(true)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/save-draft`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Save failed (${res.status})`)
+      }
+      router.push('/studio?nav=episodes')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+      setSavingDraft(false)
     }
   }
 
@@ -1027,6 +1048,15 @@ export default function EpisodeReviewPage() {
                 ← Back to Episodes
               </button>
               <div className="flex items-center gap-3">
+                {(episode.status === 'draft' || episode.status === 'approved') && (
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={savingDraft}
+                    className="px-4 py-2 text-[13px] font-semibold text-[var(--ink-light)] border border-[var(--rule)] rounded-[2px] hover:text-[var(--ink)] hover:border-[var(--ink-light)] disabled:opacity-50 transition-colors"
+                  >
+                    {savingDraft ? 'Saving…' : 'Save as Draft'}
+                  </button>
+                )}
                 {episode.status === 'scheduled' && (
                   <button
                     onClick={handleUnschedule}

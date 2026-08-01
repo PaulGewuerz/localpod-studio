@@ -243,6 +243,36 @@ router.patch('/:id/approve', async (req, res) => {
   }
 });
 
+// POST /episodes/:id/save-draft — keep the episode as a draft (reverting an
+// approved-but-unpublished one). Scheduled episodes go through /unschedule
+// (strict Megaphone cleanup) and published episodes can't be reverted here.
+router.post('/:id/save-draft', async (req, res) => {
+  const orgId = req.user.organization.id;
+  const { id } = req.params;
+
+  const episode = await prisma.episode.findUnique({
+    where: { id },
+    include: { show: true },
+  });
+
+  if (!episode || episode.show.organizationId !== orgId) {
+    return res.status(404).json({ error: 'Episode not found' });
+  }
+  if (episode.status === 'published') {
+    return res.status(400).json({ error: 'A published episode can’t be saved as a draft.' });
+  }
+  if (episode.status === 'scheduled') {
+    return res.status(400).json({ error: 'Use Unschedule to move a scheduled episode back to draft.' });
+  }
+
+  const updated = await prisma.episode.update({
+    where: { id },
+    data: { status: 'draft', ...(await discardStaleMegaphoneEpisode(episode)) },
+  });
+
+  res.json({ episodeId: updated.id, status: updated.status });
+});
+
 // POST /episodes/:id/unschedule — revert a scheduled episode to draft.
 // Scheduling creates a real Megaphone episode with the audio already ingested,
 // so it must be deleted there too — flipping the local status alone would leave
