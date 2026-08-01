@@ -140,7 +140,7 @@ router.get('/:id', async (req, res) => {
 
   const episode = await prisma.episode.findUnique({
     where: { id },
-    include: { show: true, voice: { select: { name: true } } },
+    include: { show: true, voice: { select: { id: true, name: true } } },
   });
 
   if (!episode || episode.show.organizationId !== orgId) {
@@ -341,7 +341,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/regenerate', async (req, res) => {
   const orgId = req.user.organization.id;
   const { id } = req.params;
-  const { scriptText } = req.body;
+  const { scriptText, voiceId } = req.body;
 
   if (!scriptText?.trim()) {
     return res.status(400).json({ error: 'scriptText is required' });
@@ -358,7 +358,14 @@ router.post('/:id/regenerate', async (req, res) => {
   if (!episode || episode.show.organizationId !== orgId) {
     return res.status(404).json({ error: 'Episode not found' });
   }
-  if (!episode.voice) {
+
+  // Optionally switch the episode's voice as part of the regen.
+  let voice = episode.voice;
+  if (voiceId && voiceId !== episode.voiceId) {
+    voice = await prisma.voice.findUnique({ where: { id: voiceId } });
+    if (!voice) return res.status(400).json({ error: 'Selected voice not found' });
+  }
+  if (!voice) {
     return res.status(400).json({ error: 'Episode has no voice set — cannot regenerate' });
   }
 
@@ -372,7 +379,7 @@ router.post('/:id/regenerate', async (req, res) => {
   let audioBuffer;
   let paragraphMeta = null;
   try {
-    const { audioBuffer: buffer, alignment } = await synthesizeSpeech(episode.voice.elevenLabsId, normalizedText);
+    const { audioBuffer: buffer, alignment } = await synthesizeSpeech(voice.elevenLabsId, normalizedText);
     audioBuffer = buffer;
 
     if (alignment) {
@@ -405,18 +412,25 @@ router.post('/:id/regenerate', async (req, res) => {
       characterCount: normalizedText.length,
       paragraphMeta: paragraphMeta ? JSON.stringify(paragraphMeta) : null,
       status: 'draft',
+      voiceId: voice.id,
       ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
-  res.json({ episodeId: updated.id, audioUrl: updated.audioUrl, status: updated.status });
+  res.json({
+    episodeId: updated.id,
+    audioUrl: updated.audioUrl,
+    status: updated.status,
+    paragraphMeta: paragraphMeta || null,
+    voice: { id: voice.id, name: voice.name },
+  });
 });
 
 // POST /episodes/:id/paragraphs/:order/regenerate — regenerate one paragraph and stitch
 router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
   const orgId = req.user.organization.id;
   const { id, order: orderStr } = req.params;
-  const { text } = req.body;
+  const { text, voiceId } = req.body;
   const order = parseInt(orderStr, 10);
 
   if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
@@ -436,6 +450,13 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
   if (!episode.audioUrl) {
     return res.status(400).json({ error: 'Episode has no audio' });
   }
+
+  // Optionally read this one paragraph in a different voice (per-paragraph override).
+  let voice = episode.voice;
+  if (voiceId && voiceId !== episode.voiceId) {
+    voice = await prisma.voice.findUnique({ where: { id: voiceId } });
+    if (!voice) return res.status(400).json({ error: 'Selected voice not found' });
+  }
   if (!episode.paragraphMeta) {
     return res.status(400).json({ error: 'Episode has no paragraph metadata — regenerate the full episode first' });
   }
@@ -450,7 +471,7 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
   let newAudioBuffer;
   let newDuration = para.timeEnd - para.timeStart; // fallback estimate
   try {
-    const response = await fetch(`${ELEVENLABS_API_URL}/${episode.voice.elevenLabsId}/with-timestamps`, {
+    const response = await fetch(`${ELEVENLABS_API_URL}/${voice.elevenLabsId}/with-timestamps`, {
       method: 'POST',
       headers: {
         'xi-api-key': process.env.ELEVENLABS_API_KEY,
@@ -544,7 +565,7 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
 
   const updatedParagraphs = paragraphs.map(p => {
     if (p.order === order) {
-      return { ...p, text, timeEnd: p.timeStart + newDuration, takes, activeTake };
+      return { ...p, text, timeEnd: p.timeStart + newDuration, takes, activeTake, voiceId: voice.id, voiceName: voice.name };
     }
     if (p.order > order) {
       return { ...p, timeStart: p.timeStart + shift, timeEnd: p.timeEnd + shift };
@@ -552,17 +573,21 @@ router.post('/:id/paragraphs/:order/regenerate', async (req, res) => {
     return p;
   });
 
+  // Keep scriptText in sync with the edited paragraph text (matches add/delete-paragraph).
+  const scriptText = updatedParagraphs.map(p => p.text).join('\n\n');
+
   await prisma.episode.update({
     where: { id },
     data: {
       audioUrl: publicUrl,
       paragraphMeta: JSON.stringify(updatedParagraphs),
+      scriptText,
       status: 'draft',
       ...(await discardStaleMegaphoneEpisode(episode)),
     },
   });
 
-  res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs });
+  res.json({ episodeId: id, audioUrl: publicUrl, paragraphMeta: updatedParagraphs, scriptText });
 });
 
 // POST /episodes/:id/paragraphs/:order/takes/:takeIndex/restore — swap a saved take back into the audio

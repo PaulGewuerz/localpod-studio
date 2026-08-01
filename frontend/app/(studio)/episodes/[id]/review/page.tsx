@@ -21,6 +21,14 @@ interface ParagraphMeta {
   timeEnd: number
   takes?: ParagraphTake[]
   activeTake?: number | null
+  voiceId?: string | null
+  voiceName?: string | null
+}
+
+interface Voice {
+  id: string
+  name: string
+  description?: string | null
 }
 
 interface AdMarkers {
@@ -42,7 +50,8 @@ interface Episode {
   megaphoneEpisodeId: string | null
   scheduledAt: string | null
   createdAt: string
-  voice: { name: string } | null
+  voiceId: string | null
+  voice: { id: string; name: string } | null
 }
 
 async function getToken(): Promise<string> {
@@ -80,6 +89,12 @@ export default function EpisodeReviewPage() {
   const [fullEditing, setFullEditing] = useState(false)
   const [editedScript, setEditedScript] = useState('')
   const [fullRegenerating, setFullRegenerating] = useState(false)
+
+  // Voice switching
+  const [voices, setVoices] = useState<Voice[]>([])
+  const [episodeVoiceRegen, setEpisodeVoiceRegen] = useState(false)
+  const [selectedEpisodeVoiceId, setSelectedEpisodeVoiceId] = useState<string>('')
+  const [paraVoiceId, setParaVoiceId] = useState<string>('')
 
   const [downloads, setDownloads] = useState<number | null>(null)
 
@@ -129,6 +144,15 @@ export default function EpisodeReviewPage() {
     }
     load()
   }, [id])
+
+  // Load the curated voice list for the voice switcher
+  useEffect(() => {
+    getToken()
+      .then(token => fetch(`${API_URL}/voices`, { headers: { Authorization: `Bearer ${token}` } }))
+      .then(r => (r.ok ? r.json() : []))
+      .then((data: Voice[]) => setVoices(data))
+      .catch(() => {})
+  }, [])
 
   // Stop paragraph audio when episode audio URL changes (e.g. after regen)
   useEffect(() => {
@@ -197,6 +221,7 @@ export default function EpisodeReviewPage() {
     setPlayingOrder(null)
     setEditingOrder(para.order)
     setEditedText(para.text)
+    setParaVoiceId(para.voiceId ?? episode?.voiceId ?? '')
     setActionError(null)
   }
 
@@ -214,14 +239,14 @@ export default function EpisodeReviewPage() {
       const res = await fetch(`${API_URL}/episodes/${id}/paragraphs/${order}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text: editedText }),
+        body: JSON.stringify({ text: editedText, voiceId: paraVoiceId || episode?.voiceId }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
         throw new Error(d.error || `Regenerate failed (${res.status})`)
       }
       const updated = await res.json()
-      setEpisode(prev => prev ? { ...prev, audioUrl: updated.audioUrl, status: 'draft' } : prev)
+      setEpisode(prev => prev ? { ...prev, audioUrl: updated.audioUrl, scriptText: updated.scriptText ?? prev.scriptText, status: 'draft' } : prev)
       setParagraphs(updated.paragraphMeta)
       setEditingOrder(null)
       setEditedText('')
@@ -349,6 +374,47 @@ export default function EpisodeReviewPage() {
       setActionError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setFullRegenerating(false)
+    }
+  }
+
+  // Switch the whole episode's voice and re-render all audio from the current script.
+  async function handleChangeEpisodeVoice(newVoiceId: string) {
+    if (!episode || !newVoiceId || newVoiceId === episode.voiceId) return
+    const scriptText = paragraphs.length > 0
+      ? paragraphs.map(p => p.text).join('\n\n')
+      : (fullEditing ? editedScript : (episode.scriptText ?? ''))
+    if (!scriptText.trim()) {
+      setActionError('No script to regenerate.')
+      return
+    }
+    setEpisodeVoiceRegen(true)
+    setActionError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/episodes/${id}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scriptText, voiceId: newVoiceId }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || `Regenerate failed (${res.status})`)
+      }
+      const updated = await res.json()
+      setEpisode(prev => prev ? {
+        ...prev,
+        audioUrl: updated.audioUrl,
+        status: 'draft',
+        scriptText,
+        voiceId: updated.voice?.id ?? newVoiceId,
+        voice: updated.voice ?? prev.voice,
+      } : prev)
+      if (updated.paragraphMeta) setParagraphs(updated.paragraphMeta)
+      setSelectedEpisodeVoiceId('')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setEpisodeVoiceRegen(false)
     }
   }
 
@@ -651,8 +717,35 @@ export default function EpisodeReviewPage() {
             <p className="text-[13px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">No audio available.</p>
           )}
           {episode.voice && (
-            <div className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] mt-2">
-              Voice: {episode.voice.name}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Voice</span>
+              <select
+                value={selectedEpisodeVoiceId || episode.voiceId || ''}
+                onChange={e => setSelectedEpisodeVoiceId(e.target.value)}
+                disabled={episodeVoiceRegen || voices.length === 0}
+                className="text-[12px] font-[family-name:var(--font-dm-mono)] border border-[var(--rule)] rounded-[2px] px-2 py-1 bg-white text-[var(--ink)] focus:outline-none focus:border-[var(--ink)] disabled:opacity-50"
+              >
+                {voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+              {selectedEpisodeVoiceId && selectedEpisodeVoiceId !== episode.voiceId && (
+                <>
+                  <button
+                    onClick={() => handleChangeEpisodeVoice(selectedEpisodeVoiceId)}
+                    disabled={episodeVoiceRegen}
+                    className="px-3 py-1 text-[11px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+                  >
+                    {episodeVoiceRegen ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="lp-spin inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
+                        Regenerating…
+                      </span>
+                    ) : 'Change voice & regenerate →'}
+                  </button>
+                  <span className="w-full text-[10px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                    Re-renders the whole episode from the current script and resets per-paragraph takes.
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -709,18 +802,29 @@ export default function EpisodeReviewPage() {
                               {deletingOrder === para.order ? 'Deleting…' : 'Delete paragraph'}
                             </button>
                           </div>
-                          <button
-                            onClick={() => handleParagraphRegenerate(para.order)}
-                            disabled={isRegenerating || !editedText.trim()}
-                            className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
-                          >
-                            {isRegenerating ? (
-                              <span className="flex items-center gap-2">
-                                <span className="lp-spin inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
-                                Regenerating…
-                              </span>
-                            ) : 'Regenerate paragraph →'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={paraVoiceId}
+                              onChange={e => setParaVoiceId(e.target.value)}
+                              disabled={isRegenerating || voices.length === 0}
+                              title="Voice for this paragraph"
+                              className="text-[11px] font-[family-name:var(--font-dm-mono)] border border-[var(--rule)] rounded-[2px] px-2 py-1 bg-white text-[var(--ink)] focus:outline-none focus:border-[var(--ink)] disabled:opacity-50 max-w-[110px]"
+                            >
+                              {voices.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                            </select>
+                            <button
+                              onClick={() => handleParagraphRegenerate(para.order)}
+                              disabled={isRegenerating || !editedText.trim()}
+                              className="px-4 py-1.5 text-[12px] font-semibold font-[family-name:var(--font-dm-mono)] text-white bg-[var(--ink)] hover:bg-[#2a2825] disabled:opacity-50 rounded-[2px] transition-colors"
+                            >
+                              {isRegenerating ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="lp-spin inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
+                                  Regenerating…
+                                </span>
+                              ) : 'Regenerate paragraph →'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -729,9 +833,16 @@ export default function EpisodeReviewPage() {
                           className="px-3.5 py-3 flex items-start gap-2"
                           onClick={() => editingOrder === null && startEditParagraph(para)}
                         >
-                          <p className="flex-1 text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
-                            {para.text}
-                          </p>
+                          <div className="flex-1 flex flex-col gap-1">
+                            <p className="text-[13px] font-[family-name:var(--font-dm-sans)] leading-relaxed text-[var(--ink-light)]">
+                              {para.text}
+                            </p>
+                            {para.voiceId && para.voiceId !== episode.voiceId && para.voiceName && (
+                              <span className="text-[10px] font-[family-name:var(--font-dm-mono)] text-[var(--blue)]">
+                                Voice: {para.voiceName}
+                              </span>
+                            )}
+                          </div>
                           <button
                             onClick={e => { e.stopPropagation(); playParagraph(para) }}
                             className="shrink-0 mt-0.5 w-6 h-6 flex items-center justify-center text-[var(--ink-faint)] hover:text-[var(--ink)] transition-colors"
