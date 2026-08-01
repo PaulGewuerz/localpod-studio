@@ -8,6 +8,18 @@ import AdsView from './AdsView'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+// Prepend https:// when a user-entered URL has no scheme, so bare domains like
+// "localpod.co" become real links instead of relative paths that 404. Leaves
+// existing schemes (http, https, mailto, tel) and protocol-relative URLs alone.
+function normalizeUrl(input: string): string {
+  const url = input.trim()
+  if (!url) return url
+  // Already a full URL (http://, https://, ftp://), a mail/phone link, or
+  // protocol-relative — leave those as-is. Everything else gets https://.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url) || /^(mailto:|tel:)/i.test(url) || url.startsWith('//')) return url
+  return `https://${url}`
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Voice {
@@ -1088,7 +1100,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   function insertLink() {
     const div = showNotesRef.current
     if (!div) return
-    const url = window.prompt('URL:', 'https://')
+    const input = window.prompt('URL:', 'https://')
+    if (!input) return
+    const url = normalizeUrl(input)
     if (!url) return
     div.focus()
     document.execCommand('createLink', false, url)
@@ -1103,7 +1117,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   function insertDescriptionLink() {
     const div = settingsDescriptionRef.current
     if (!div) return
-    const url = window.prompt('URL:', 'https://')
+    const input = window.prompt('URL:', 'https://')
+    if (!input) return
+    const url = normalizeUrl(input)
     if (!url) return
     div.focus()
     document.execCommand('createLink', false, url)
@@ -1580,7 +1596,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                         onInput={() => setShowNotes(showNotesRef.current?.innerHTML ?? '')}
                         onClick={e => {
                           const link = (e.target as HTMLElement).closest('a')
-                          if (link) { e.preventDefault(); window.open(link.getAttribute('href') ?? '', '_blank', 'noreferrer') }
+                          if (link) { e.preventDefault(); window.open(normalizeUrl(link.getAttribute('href') ?? ''), '_blank', 'noreferrer') }
                         }}
                         className="border border-[var(--rule)] rounded-[2px] px-3.5 py-3.5 text-[13px] font-[family-name:var(--font-dm-sans)] bg-[var(--bg)] text-[var(--ink)] min-h-[160px] w-full leading-relaxed focus:outline-none focus:border-[var(--ink)] focus:bg-white transition-colors cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
                         data-placeholder="Optional — appears in the episode description on Spotify, Apple Podcasts, etc."
@@ -2065,7 +2081,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   onInput={() => setSettingsDescription(settingsDescriptionRef.current?.innerHTML ?? '')}
                   onClick={e => {
                     const link = (e.target as HTMLElement).closest('a')
-                    if (link) { e.preventDefault(); window.open(link.getAttribute('href') ?? '', '_blank', 'noreferrer') }
+                    if (link) { e.preventDefault(); window.open(normalizeUrl(link.getAttribute('href') ?? ''), '_blank', 'noreferrer') }
                   }}
                   className="w-full border border-[var(--rule)] rounded-[4px] px-3 py-2 text-[14px] text-[var(--ink)] font-[family-name:var(--font-nunito)] focus:outline-none focus:border-[var(--ink-light)] min-h-[100px] leading-relaxed cursor-text [&_a]:text-[var(--blue)] [&_a]:underline [&_a]:underline-offset-2 empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--ink-faint)] empty:before:pointer-events-none"
                   data-placeholder="Describe your podcast…"
