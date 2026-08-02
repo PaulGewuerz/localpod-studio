@@ -37,6 +37,7 @@ app.use('/analytics', requireActiveSubscription, require('./routes/analytics'));
 app.use('/ad-campaigns', requireActiveSubscription, blockSoloPlan, require('./routes/ad-campaigns'));
 app.use('/billing', require('./routes/billing'));
 app.use('/admin', require('./middleware/requireAdmin'), require('./routes/admin'));
+app.use('/automation', require('./routes/automation'));
 app.use('/pronunciation', require('./routes/pronunciation'));
 app.use('/support', require('./routes/support'));
 app.use('/distribution', requireActiveSubscription, require('./routes/distribution'));

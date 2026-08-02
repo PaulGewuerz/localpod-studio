@@ -9,7 +9,6 @@ const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
 const { characterLimitForPlan } = require('../utils/planLimits');
 const { synthesizeSpeech } = require('../services/generateEpisode');
-const { sendEpisodeReadyEmail } = require('../email');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -1047,37 +1046,6 @@ router.post('/:id/preview-audio', async (req, res) => {
   } catch (err) {
     console.error('Preview audio error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to generate preview' });
-  }
-});
-
-// POST /episodes/:id/notify-ready — email the account holder that this episode
-// is a draft pending review, with a deep link to the review page. Meant to be
-// called by an automation agent right after it drops a draft under the account.
-router.post('/:id/notify-ready', async (req, res) => {
-  const orgId = req.user.organization.id;
-  const { id } = req.params;
-
-  const episode = await prisma.episode.findUnique({
-    where: { id },
-    include: { show: true },
-  });
-
-  if (!episode || episode.show.organizationId !== orgId) {
-    return res.status(404).json({ error: 'Episode not found' });
-  }
-
-  const reviewUrl = `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/episodes/${episode.id}/review`;
-  try {
-    await sendEpisodeReadyEmail({
-      to: req.user.email,
-      showName: episode.show.name,
-      episodeTitle: episode.title,
-      reviewUrl,
-    });
-    res.json({ notified: true, to: req.user.email });
-  } catch (err) {
-    console.error('notify-ready email failed:', err.message);
-    res.status(500).json({ error: 'Failed to send notification email' });
   }
 });
 
