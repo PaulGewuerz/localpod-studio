@@ -1,6 +1,5 @@
 const prisma = require('../prisma');
 const { generateDigestEpisode } = require('../services/generateEpisode');
-const { sendEpisodeReadyEmail } = require('../email');
 const { discoverArticles } = require('./articleSource');
 const { fetchPageArticle } = require('../utils/extractArticle');
 const { htmlToText } = require('../utils/htmlToText');
@@ -155,13 +154,6 @@ async function runShowDigest(show, now) {
       data: { status: 'generated', episodeId: episode.id },
     });
     console.log(`[feed-poller] digest draft created: "${episode.title}" (${segments.length} article(s), show: ${show.name})`);
-
-    // Notify the account holder(s) that a draft is ready for review.
-    const reviewUrl = `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/episodes/${episode.id}/review`;
-    for (const orgUser of show.organization.users || []) {
-      sendEpisodeReadyEmail({ to: orgUser.email, showName: show.name, episodeTitle: episode.title, reviewUrl })
-        .catch(err => console.error(`[feed-poller] episode-ready email failed for ${orgUser.email}:`, err.message));
-    }
   } catch (err) {
     console.error(`[feed-poller] digest failed (show: ${show.name}):`, err.message);
     await prisma.ingestedArticle.updateMany({
@@ -186,7 +178,7 @@ async function pollAllFeeds() {
         feedUrl: { not: null },
         automationIntervalDays: { not: null },
       },
-      include: { organization: { include: { subscription: true, users: true } } },
+      include: { organization: { include: { subscription: true } } },
     });
 
     for (const show of shows) {
