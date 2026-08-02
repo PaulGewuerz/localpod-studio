@@ -188,6 +188,35 @@ async function sendDistributionRequestConfirmation({ to, showName }) {
   });
 }
 
+async function sendEpisodeReadyEmail({ to, showName, episodeTitle, reviewUrl }) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `New episode ready for review — ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:22px;font-weight:600;margin-bottom:8px">Your next episode is ready for review.</h1>
+        <p style="color:#555;margin-bottom:16px">
+          A new draft episode has been generated for <strong>${showName}</strong>:
+        </p>
+        <p style="color:#111;font-size:16px;font-weight:600;margin-bottom:24px">${episodeTitle}</p>
+        <p style="color:#555;margin-bottom:24px">
+          Give it a listen, make any edits, and approve or schedule it when you're happy.
+          Nothing publishes until you say so.
+        </p>
+        <a href="${reviewUrl}"
+           style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;
+                  padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px">
+          Review episode →
+        </a>
+        <p style="color:#999;font-size:12px;margin-top:40px">
+          LocalPod Studio · If you have questions, reply to this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 // Adds (or upserts) a contact into the Resend audience used for marketing/
 // re-engagement email. Safe no-op if RESEND_AUDIENCE_ID isn't configured.
 async function addContactToAudience({ email, firstName, lastName }) {
@@ -205,4 +234,4 @@ async function addContactToAudience({ email, firstName, lastName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, addContactToAudience };
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, sendEpisodeReadyEmail, addContactToAudience };
