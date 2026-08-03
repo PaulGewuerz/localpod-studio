@@ -1,7 +1,7 @@
 # LocalPod Studio — Status & TODO
 
 > Living doc. Update this at the end of every working session.
-> Last updated: 2026-07-08
+> Last updated: 2026-08-03
 
 ---
 
@@ -75,6 +75,8 @@ Still open:
 ---
 
 ## Done (recent, newest first)
+
+- **Agent-callable "episode ready for review" email — `POST /automation/notify-ready`** (2026-08-03) — for an unattended automation agent that builds a daily digest and drops it as a draft, then wants to notify the account holder. The agent drives the studio via the browser (fills New Episode → clicks Next → reads `episodeId` from the `/episodes/{id}/review` URL), so it can't hold a short-lived Supabase user token. New route `backend/src/routes/automation.js`: static-key auth (`NOTIFY_API_KEY`, `Authorization: Bearer`, constant-time compare; 503 if unset, 401 on mismatch), body `{ episodeId }` → loads the episode, emails the owning org's user(s) a review link via `sendEpisodeReadyEmail` (new template in `email.js`). `NOTIFY_API_KEY` set on Railway (prod) + local `.env` (gitignored). **Not** wired into the feed poller (an earlier attempt to auto-email on every digest draft was reverted) and **not** the Supabase-authed `/episodes/:id/notify-ready` (also reverted) — the agent isn't a logged-in user. Verified: bad/no key → 401, good key → 200 + real email (correct `app.localpod.co` link; prod `FRONTEND_URL` confirmed). Key is a shared secret, notify-only, low blast radius; rotate via Railway if leaked.
 
 - **Scheduled episodes: ads now stitched at schedule time + ad saves re-sync Megaphone** (2026-07-13, `6d8c15a`) — `POST /schedule` sent raw `episode.audioUrl` to Megaphone (only approve ran `preparePublishAudio`), so scheduled episodes never had assigned ads in the ingested audio; the ad panel's Save only wrote JSON (the studio "updated audio" is a local preview). Fix: schedule now stitches + applies approve's DAI guard; saving ad-assignments on a scheduled episode (future pubdate) deletes + re-creates the Megaphone episode with freshly stitched audio at the same pubdate (delete-failure → still scheduled, retry; re-create-failure → back to drafts, not silently unscheduled); ad-markers no longer pushes DAI slots when local stitching is in use; panel button says "Save & sync" for scheduled too. Verified live on "Optional County Road and Bridge Fee" (user confirmed correct audio in Megaphone).
 
