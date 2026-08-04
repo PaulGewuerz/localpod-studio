@@ -105,6 +105,27 @@ async function sendCancellationEmail({ to, showName, accessEndsDate }) {
   });
 }
 
+async function sendNewSignupAdminEmail({ orgName, showName, userEmail, plan, isTrialing }) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
+  const planName = plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
+  const kind = isTrialing ? 'Trial started (card on file)' : 'New paid subscriber';
+  await resend.emails.send({
+    from: FROM,
+    to: adminEmail,
+    subject: `New signup — ${showName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h1 style="font-size:18px;font-weight:600;margin-bottom:8px">${kind}</h1>
+        <p style="color:#555;margin-bottom:8px"><strong>Org:</strong> ${orgName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Show:</strong> ${showName}</p>
+        <p style="color:#555;margin-bottom:8px"><strong>Customer:</strong> ${userEmail}</p>
+        <p style="color:#555;margin-bottom:24px"><strong>Plan:</strong> ${planName}</p>
+        <p style="color:#999;font-size:12px;margin-top:40px">LocalPod Studio</p>
+      </div>
+    `,
+  });
+}
+
 async function sendCancellationAdminEmail({ orgName, showName, userEmail, accessEndsDate }) {
   const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
   const dateStr = accessEndsDate
@@ -234,4 +255,4 @@ async function addContactToAudience({ email, firstName, lastName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, sendEpisodeReadyEmail, addContactToAudience };
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendNewSignupAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, sendEpisodeReadyEmail, addContactToAudience };

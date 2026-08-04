@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
-const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, addContactToAudience } = require('../email');
+const { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendNewSignupAdminEmail, addContactToAudience } = require('../email');
 const { sendSMS } = require('../notify');
 const { provisionMegaphoneShow } = require('../services/provisionShow');
 
@@ -71,6 +71,13 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             // Alert owner
             sendSMS(`New LocalPod ${isTrialing ? 'trial (card on file)' : 'subscriber'}: ${obj.customer_email} (${show?.name ?? user.organization.name})`)
               .catch(err => console.error('SMS alert failed:', err.message));
+            sendNewSignupAdminEmail({
+              orgName: user.organization.name,
+              showName: show?.name ?? user.organization.name,
+              userEmail: obj.customer_email,
+              plan,
+              isTrialing,
+            }).catch(err => console.error('New-signup admin email failed:', err.message));
           }
         }
         break;
