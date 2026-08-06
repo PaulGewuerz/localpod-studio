@@ -1,5 +1,6 @@
 const prisma = require('../prisma');
 const { generateDigestEpisode } = require('../services/generateEpisode');
+const { writeEpisodeScript } = require('../services/scriptwriter');
 const { discoverArticles } = require('./articleSource');
 const { fetchPageArticle } = require('../utils/extractArticle');
 const { htmlToText } = require('../utils/htmlToText');
@@ -110,7 +111,7 @@ async function runShowDigest(show, now) {
       });
       continue;
     }
-    segments.push({ title: item.title || pageTitle || 'Untitled', text });
+    segments.push({ title: item.title || pageTitle || 'Untitled', text, url: item.url || null });
     usedRecordIds.push(record.id);
   }
 
@@ -140,14 +141,39 @@ async function runShowDigest(show, now) {
     ? (htmlToText(firstRaw.contentSnippet || firstRaw.summary || '').slice(0, 500) || null)
     : `Featuring: ${segments.map(s => s.title).join(' • ')}`.slice(0, 500);
 
+  // Raw-digest inputs (fallback / default).
+  let ttsSegments = segments;
+  let episodeTitle = digestTitle;
+  let episodeDescription = description;
+
+  // Scripted path (opt-in per show). Rewrite the raw articles into one
+  // conversational script + HTML show notes before TTS. Any failure falls back
+  // to the raw digest so a poll run never dies on the LLM.
+  if (show.scriptwriterEnabled) {
+    try {
+      const script = await writeEpisodeScript({
+        segments,
+        scriptConfig: show.scriptConfig || {},
+        showName: show.name,
+        date: now,
+      });
+      ttsSegments = [{ title: script.title, text: script.scriptText }];
+      episodeTitle = script.title;
+      episodeDescription = script.showNotesHtml || script.description || description;
+      console.log(`[feed-poller] ${show.name}: scripted "${script.title}" (${script.scriptText.length} chars from ${segments.length} article(s))`);
+    } catch (err) {
+      console.error(`[feed-poller] ${show.name}: scriptwriter failed, using raw digest — ${err.message}`);
+    }
+  }
+
   try {
     const episode = await generateDigestEpisode({
       org: show.organization,
       show,
       voiceElevenLabsId: voice.elevenLabsId,
-      segments,
-      title: digestTitle,
-      description,
+      segments: ttsSegments,
+      title: episodeTitle,
+      description: episodeDescription,
     });
     await prisma.ingestedArticle.updateMany({
       where: { id: { in: usedRecordIds } },
