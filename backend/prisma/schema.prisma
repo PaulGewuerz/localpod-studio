@@ -51,6 +51,8 @@ model Show {
   automationNextRunAt DateTime?    // poller's "is this show due?" clock
   automationLastRunAt DateTime?    // last time a digest run fired
   automationAdSelections Json?     // { preRollCampaignId, postRollCampaignId, midRollCampaignIds: [] }
+  scriptwriterEnabled Boolean      @default(false)  // opt-in: LLM rewrites articles into a conversational script (else raw digest)
+  scriptConfig        Json?        // scriptwriter style: { tone, wordTarget, sections: [], extraGuidance }
   createdAt           DateTime     @default(now())
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])
