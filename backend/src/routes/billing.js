@@ -5,6 +5,7 @@ const prisma = require('../prisma');
 const requireActiveSubscription = require('../middleware/requireActiveSubscription');
 
 const PRICE_IDS = {
+  starter:   { monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,   annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID },
   solo:      { monthly: process.env.STRIPE_SOLO_MONTHLY_PRICE_ID,      annual: process.env.STRIPE_SOLO_ANNUAL_PRICE_ID },
   publisher: { monthly: process.env.STRIPE_PUBLISHER_MONTHLY_PRICE_ID, annual: process.env.STRIPE_PUBLISHER_ANNUAL_PRICE_ID },
 };

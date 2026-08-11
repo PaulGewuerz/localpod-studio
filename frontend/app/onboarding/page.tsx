@@ -176,7 +176,7 @@ export default function OnboardingPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
 
-  const [selectedPlan, setSelectedPlan] = useState<'solo' | 'publisher'>('publisher')
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'solo' | 'publisher'>('publisher')
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -449,12 +449,31 @@ export default function OnboardingPage() {
                   onClick={() => setBillingInterval('annual')}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${billingInterval === 'annual' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
                 >
-                  Annual <span className="text-xs font-normal opacity-75">save ~20%</span>
+                  Annual <span className="text-xs font-normal opacity-75">2 months free</span>
                 </button>
               </div>
 
               {/* Plan cards */}
               <div className="space-y-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan('starter')}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${selectedPlan === 'starter' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-gray-900">Starter</span>
+                    <span className="font-semibold text-gray-900">
+                      {billingInterval === 'annual' ? '$16/mo' : '$19/mo'}
+                      {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
+                    </span>
+                  </div>
+                  <ul className="text-xs text-gray-500 space-y-0.5">
+                    <li>1 podcast feed</li>
+                    <li>25,000 AI characters / month</li>
+                    <li>RSS distribution</li>
+                  </ul>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setSelectedPlan('solo')}
@@ -463,7 +482,7 @@ export default function OnboardingPage() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-gray-900">Solo</span>
                     <span className="font-semibold text-gray-900">
-                      {billingInterval === 'annual' ? '$39/mo' : '$49/mo'}
+                      {billingInterval === 'annual' ? '$41/mo' : '$49/mo'}
                       {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
                     </span>
                   </div>
@@ -482,7 +501,7 @@ export default function OnboardingPage() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-gray-900">Publisher</span>
                     <span className="font-semibold text-gray-900">
-                      {billingInterval === 'annual' ? '$82/mo' : '$99/mo'}
+                      {billingInterval === 'annual' ? '$83/mo' : '$99/mo'}
                       {billingInterval === 'annual' && <span className="text-xs font-normal text-gray-400 ml-1">billed annually</span>}
                     </span>
                   </div>

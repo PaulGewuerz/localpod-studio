@@ -153,9 +153,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           : obj.status;
 
         const priceId = obj.items?.data?.[0]?.price?.id;
+        const starterPrices = [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID, process.env.STRIPE_STARTER_ANNUAL_PRICE_ID];
         const soloPrices = [process.env.STRIPE_SOLO_MONTHLY_PRICE_ID, process.env.STRIPE_SOLO_ANNUAL_PRICE_ID];
         const publisherPrices = [process.env.STRIPE_PUBLISHER_MONTHLY_PRICE_ID, process.env.STRIPE_PUBLISHER_ANNUAL_PRICE_ID];
-        const plan = soloPrices.includes(priceId) ? 'solo'
+        const plan = starterPrices.includes(priceId) ? 'starter'
+          : soloPrices.includes(priceId) ? 'solo'
           : publisherPrices.includes(priceId) ? 'publisher'
           : undefined;
 

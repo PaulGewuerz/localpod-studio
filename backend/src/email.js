@@ -36,7 +36,7 @@ async function sendWelcomeEmail({ to, showName }) {
 }
 
 async function sendTrialEndingEmail({ to, showName, plan, amount, interval, chargeDate }) {
-  const planName = plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
+  const planName = plan === 'starter' ? 'LocalPod Starter' : plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
   const dateStr = chargeDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const amountStr = amount != null
     ? `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`
@@ -107,7 +107,7 @@ async function sendCancellationEmail({ to, showName, accessEndsDate }) {
 
 async function sendNewSignupAdminEmail({ orgName, showName, userEmail, plan, isTrialing }) {
   const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
-  const planName = plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
+  const planName = plan === 'starter' ? 'LocalPod Starter' : plan === 'solo' ? 'LocalPod Solo' : 'LocalPod Publisher';
   const kind = isTrialing ? 'Trial started (card on file)' : 'New paid subscriber';
   await resend.emails.send({
     from: FROM,

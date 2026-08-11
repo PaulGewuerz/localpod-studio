@@ -94,14 +94,14 @@ const NAV_TITLES: Record<NavKey, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Per-plan cap on podcast feeds (shows). Solo = 1, everything else gets the
-// Publisher allowance of 3 (same fail-open convention as the backend: unknown/
+// Per-plan cap on podcast feeds (shows). Starter/Solo = 1, everything else gets
+// the Publisher allowance of 3 (same fail-open convention as the backend: unknown/
 // null plans are NOT downgraded). This is a UI hint only — the real cap is
 // enforced server-side by showLimitForPlan in backend/src/utils/planLimits.js
 // (the single source of truth). Keep this in sync with that file if the limits
 // change; the backend is authoritative.
 function showLimitForPlan(plan: string | null | undefined): number {
-  return plan === 'solo' ? 1 : 3
+  return plan === 'starter' || plan === 'solo' ? 1 : 3
 }
 
 async function getToken(): Promise<string> {
@@ -1154,7 +1154,12 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   const monthlyPublishedCount = episodes.filter(e =>
     e.status === 'published' && new Date(e.createdAt) >= startOfMonth
   ).length
-  const isSolo = me?.subscription?.plan === 'solo'
+  const plan = me?.subscription?.plan
+  const isStarter = plan === 'starter'
+  const isSolo = plan === 'solo'
+  // Ad Manager is Publisher-only; the entry tiers (Starter, Solo) are gated.
+  // Mirrors backend/src/middleware/blockSoloPlan.js.
+  const adBlocked = isStarter || isSolo
   const isTrial = me?.subscription?.status === 'trial'
   const trialDaysLeft = me?.subscription?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(me.subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -1166,7 +1171,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   // Prefer the limit reported by the backend (single source of truth in
   // planLimits.js). Fall back to a plan map — defaulting to the publisher cap so
   // legacy/unknown plans are never downgraded — if usage hasn't loaded yet.
-  const CHARACTER_LIMIT = characterLimit ?? (isSolo ? 50_000 : 150_000)
+  const CHARACTER_LIMIT = characterLimit ?? (isStarter ? 25_000 : isSolo ? 50_000 : 150_000)
   const monthlyCharCount = monthlyCharacters
 
   // ── Sidebar nav item ──────────────────────────────────────────────────────────
@@ -1686,7 +1691,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
           {/* ── ADS ───────────────────────────────────────────────────── */}
           {activeNav === 'ads' && (
-            isSolo ? (
+            adBlocked ? (
               <div className="max-w-lg">
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                   <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Ad Manager</div>
@@ -1737,6 +1742,11 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                       {me?.subscription?.stripeCustomerId && !cancelPending ? ' — your subscription starts automatically when the trial ends' : ''}
                     </div>
                   </>
+                ) : isStarter ? (
+                  <>
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Starter — $19/mo</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 25,000 AI characters/month · RSS distribution</div>
+                  </>
                 ) : isSolo ? (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
@@ -1769,7 +1779,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               ) : (
                 <>
                   {/* Other plan */}
-                  {isSolo ? (
+                  {adBlocked ? (
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
