@@ -76,7 +76,7 @@ function AdMarkerBadge({ markers }: { markers: AdMarkers | null }) {
 
 const EMPTY_FORM = { name: '', audioUrl: '', type: 'pre-roll', status: 'active', startDate: '', endDate: '', notes: '' }
 
-export default function AdsView({ getToken }: { getToken: () => Promise<string> }) {
+export default function AdsView({ getToken, campaignLimit = Infinity }: { getToken: () => Promise<string>; campaignLimit?: number }) {
   const [subNav, setSubNav] = useState<AdSubNav>('overview')
 
   // Overview
@@ -183,6 +183,7 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
   }
 
   function openNew() {
+    if (campaigns.length >= campaignLimit) return
     setForm({ ...EMPTY_FORM })
     setEditId(null)
     setCampError(null)
@@ -469,15 +470,22 @@ export default function AdsView({ getToken }: { getToken: () => Promise<string> 
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-[family-name:var(--font-nunito)] font-bold text-base text-[var(--ink)]">
-              {campaigns.length} Campaign{campaigns.length !== 1 ? 's' : ''}
+              {campaigns.length}{Number.isFinite(campaignLimit) ? ` of ${campaignLimit}` : ''} Campaign{campaigns.length !== 1 ? 's' : ''}
             </h2>
             <button
               onClick={openNew}
-              className="px-4 py-2 text-[13px] font-semibold text-white bg-[var(--ink)] hover:bg-[#2a2825] rounded-[2px] transition-colors"
+              disabled={campaigns.length >= campaignLimit}
+              className="px-4 py-2 text-[13px] font-semibold text-white bg-[var(--ink)] hover:bg-[#2a2825] rounded-[2px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--ink)]"
             >
               + New Campaign
             </button>
           </div>
+
+          {campaigns.length >= campaignLimit && Number.isFinite(campaignLimit) && (
+            <div className="bg-[#fdf6e9] border border-[#e8d9b5] rounded-[2px] px-4 py-3 mb-4 text-[13px] text-[#7a5b1e]">
+              You&apos;ve reached your plan&apos;s limit of {campaignLimit} ad campaign{campaignLimit === 1 ? '' : 's'}. Delete one, or upgrade to Publisher for unlimited campaigns.
+            </div>
+          )}
 
           {/* Form */}
           {showForm && (

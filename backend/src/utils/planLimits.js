@@ -36,6 +36,22 @@ function showLimitForPlan(plan) {
   return PLAN_SHOW_LIMITS[plan] ?? DEFAULT_SHOW_LIMIT;
 }
 
+// Per-plan cap on ad campaigns. Ad Manager is entry-gated: Starter gets 0 (no
+// access at all — enforced by middleware/requireAdManagerAccess.js), Solo is
+// capped at 2, and everything else (Publisher + unknown/null/legacy) is
+// unlimited. Same fail-open convention: a plan we don't recognize is never
+// restricted. Enforced at create time in routes/ad-campaigns.js.
+const PLAN_AD_CAMPAIGN_LIMITS = {
+  starter: 0,
+  solo: 2,
+};
+
+const DEFAULT_AD_CAMPAIGN_LIMIT = Infinity;
+
+function adCampaignLimitForPlan(plan) {
+  return PLAN_AD_CAMPAIGN_LIMITS[plan] ?? DEFAULT_AD_CAMPAIGN_LIMIT;
+}
+
 module.exports = {
   PLAN_CHARACTER_LIMITS,
   DEFAULT_CHARACTER_LIMIT,
@@ -43,4 +59,7 @@ module.exports = {
   PLAN_SHOW_LIMITS,
   DEFAULT_SHOW_LIMIT,
   showLimitForPlan,
+  PLAN_AD_CAMPAIGN_LIMITS,
+  DEFAULT_AD_CAMPAIGN_LIMIT,
+  adCampaignLimitForPlan,
 };

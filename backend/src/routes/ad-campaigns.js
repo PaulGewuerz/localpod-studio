@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma');
 const { supabaseAdmin } = require('../supabase');
+const { adCampaignLimitForPlan } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const VALID_TYPES = ['pre-roll', 'mid-roll', 'post-roll'];
@@ -32,6 +33,19 @@ router.post('/', async (req, res) => {
 
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
   if (!VALID_TYPES.includes(type)) return res.status(400).json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` });
+
+  // Per-plan campaign cap (Solo = 2, Publisher/legacy = unlimited). Starter is
+  // blocked from this route entirely by requireAdManagerAccess.
+  const limit = adCampaignLimitForPlan(req.user.organization.subscription?.plan);
+  if (Number.isFinite(limit)) {
+    const count = await prisma.adCampaign.count({ where: { organizationId: orgId } });
+    if (count >= limit) {
+      return res.status(403).json({
+        error: `Your plan allows up to ${limit} ad campaign${limit === 1 ? '' : 's'}. Delete one or upgrade to add more.`,
+        limitReached: true,
+      });
+    }
+  }
 
   const campaign = await prisma.adCampaign.create({
     data: {

@@ -1157,9 +1157,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
   const plan = me?.subscription?.plan
   const isStarter = plan === 'starter'
   const isSolo = plan === 'solo'
-  // Ad Manager is Publisher-only; the entry tiers (Starter, Solo) are gated.
-  // Mirrors backend/src/middleware/blockSoloPlan.js.
-  const adBlocked = isStarter || isSolo
+  const belowPublisher = isStarter || isSolo
+  // Ad Manager access mirrors backend adCampaignLimitForPlan / requireAdManagerAccess:
+  // Starter gets 0 (wall), Solo is capped at 2, Publisher (and legacy) unlimited.
+  const adCampaignLimit = isStarter ? 0 : isSolo ? 2 : Infinity
   const isTrial = me?.subscription?.status === 'trial'
   const trialDaysLeft = me?.subscription?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(me.subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -1691,20 +1692,20 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
           {/* ── ADS ───────────────────────────────────────────────────── */}
           {activeNav === 'ads' && (
-            adBlocked ? (
+            adCampaignLimit <= 0 ? (
               <div className="max-w-lg">
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7">
                   <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Ad Manager</div>
-                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">A Publisher feature</div>
+                  <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">Available on Solo and Publisher</div>
                   <p className="text-[13px] text-[var(--ink-light)] mb-5">
-                    Create audio ads and manage campaigns to monetize your episodes. Ad Manager is included with LocalPod Publisher ($99/mo). Upgrade to start running ads.
+                    Create audio ads and manage campaigns to monetize your episodes. Ad Manager is available on the Solo (up to 2 campaigns) and Publisher (unlimited) plans. Upgrade to start running ads.
                   </p>
                   <button
                     onClick={handlePortal}
                     disabled={portalLoading}
                     className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
                   >
-                    {portalLoading ? 'Opening…' : 'Upgrade to Publisher →'}
+                    {portalLoading ? 'Opening…' : 'Upgrade →'}
                   </button>
                   {portalError && (
                     <p className="mt-3 text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)]">{portalError}</p>
@@ -1712,7 +1713,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 </div>
               </div>
             ) : (
-              <AdsView getToken={getToken} />
+              <AdsView getToken={getToken} campaignLimit={adCampaignLimit} />
             )
           )}
 
@@ -1779,7 +1780,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
               ) : (
                 <>
                   {/* Other plan */}
-                  {adBlocked ? (
+                  {belowPublisher ? (
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
