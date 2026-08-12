@@ -1751,12 +1751,12 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 ) : isSolo ? (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
-                    <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
                   </>
                 ) : (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                    <div className="text-[13px] text-[var(--ink-light)]">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
                   </>
                 )}
               </div>
@@ -1765,7 +1765,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                   <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Subscribe</div>
                   <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Ad Manager · Priority support</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
                   <button
                     onClick={handleCheckout}
                     disabled={portalLoading}
@@ -1784,7 +1784,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                      <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Ad Manager · Priority support</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Unlimited ad campaigns · Priority support</div>
                       <button
                         onClick={handlePortal}
                         disabled={portalLoading}
@@ -1797,7 +1797,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Downgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
-                      <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · RSS distribution</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
                       <button
                         onClick={handlePortal}
                         disabled={portalLoading}

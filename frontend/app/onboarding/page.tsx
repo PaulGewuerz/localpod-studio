@@ -489,6 +489,7 @@ export default function OnboardingPage() {
                   <ul className="text-xs text-gray-500 space-y-0.5">
                     <li>1 podcast feed</li>
                     <li>50,000 AI characters / month</li>
+                    <li>Up to 2 ad campaigns</li>
                     <li>RSS distribution</li>
                   </ul>
                 </button>
@@ -508,7 +509,7 @@ export default function OnboardingPage() {
                   <ul className="text-xs text-gray-500 space-y-0.5">
                     <li>Up to 5 podcast feeds</li>
                     <li>150,000 AI characters / month</li>
-                    <li>RSS distribution · Ad Manager · Priority support</li>
+                    <li>RSS distribution · Unlimited ad campaigns · Priority support</li>
                   </ul>
                 </button>
               </div>
