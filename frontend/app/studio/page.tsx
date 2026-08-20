@@ -1273,6 +1273,12 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           <div className="text-[10px] text-white/40 font-[family-name:var(--font-dm-mono)] mb-3">
             {monthlyCharCount.toLocaleString()} / {CHARACTER_LIMIT.toLocaleString()} characters
           </div>
+          <a
+            href="mailto:paul@localpod.co?subject=LocalPod%20Studio%20support"
+            className="block w-full text-left text-[11px] text-white/30 hover:text-white/60 transition-colors font-[family-name:var(--font-dm-mono)] mb-2"
+          >
+            Contact support
+          </a>
           <button
             onClick={async () => { await supabase.auth.signOut(); router.replace('/login') }}
             className="w-full text-left text-[11px] text-white/30 hover:text-white/60 transition-colors font-[family-name:var(--font-dm-mono)]"
