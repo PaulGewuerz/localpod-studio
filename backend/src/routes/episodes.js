@@ -45,6 +45,7 @@ router.get('/usage', async (req, res) => {
   res.json({
     monthlyCharacters: usage._sum.characterCount ?? 0,
     characterLimit: characterLimitForPlan(subscription?.plan),
+    creditBalance: subscription?.creditBalance ?? 0,
   });
 });
 

@@ -95,13 +95,13 @@ const NAV_TITLES: Record<NavKey, string> = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Per-plan cap on podcast feeds (shows). Starter/Solo = 1, everything else gets
-// the Publisher allowance of 3 (same fail-open convention as the backend: unknown/
+// the Publisher allowance of 4 (same fail-open convention as the backend: unknown/
 // null plans are NOT downgraded). This is a UI hint only — the real cap is
 // enforced server-side by showLimitForPlan in backend/src/utils/planLimits.js
 // (the single source of truth). Keep this in sync with that file if the limits
 // change; the backend is authoritative.
 function showLimitForPlan(plan: string | null | undefined): number {
-  return plan === 'starter' || plan === 'solo' ? 1 : 3
+  return plan === 'starter' || plan === 'solo' ? 1 : 4
 }
 
 async function getToken(): Promise<string> {
@@ -500,6 +500,8 @@ function StudioInner() {
   const [episodeRefreshKey, setEpisodeRefreshKey] = useState(0)
   const [monthlyCharacters, setMonthlyCharacters] = useState(0)
   const [characterLimit, setCharacterLimit] = useState<number | null>(null)
+  const [creditBalance, setCreditBalance] = useState(0)
+  const [creditsPurchased, setCreditsPurchased] = useState(false)
 
   // New Episode form state
   const [epMode, setEpMode] = useState<'ai' | 'url' | 'upload'>('ai')
@@ -624,6 +626,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
         const validNavKeys: NavKey[] = ['dashboard', 'new', 'episodes', 'analytics', 'billing', 'shows', 'dist', 'settings', 'ads']
         if (navParam && validNavKeys.includes(navParam)) setActiveNav(navParam)
 
+        // Returned from a successful add-on credit purchase (Stripe success_url).
+        if (searchParams.get('credits') === 'success') setCreditsPurchased(true)
+
         // Load voices
         const vRes = await fetch(`${API_URL}/voices`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -654,6 +659,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           const data = await usageRes.json()
           setMonthlyCharacters(data.monthlyCharacters)
           if (typeof data.characterLimit === 'number') setCharacterLimit(data.characterLimit)
+          if (typeof data.creditBalance === 'number') setCreditBalance(data.creditBalance)
         }
       } catch { /* silent */ }
       finally { setLoadingEpisodes(false) }
@@ -986,6 +992,25 @@ const showNotesRef = useRef<HTMLDivElement>(null)
     }
   }
 
+  async function handleBuyCredits(pack: '25k' | '50k') {
+    setPortalLoading(true)
+    setPortalError(null)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/billing/buy-credits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pack }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to start checkout')
+      window.location.href = data.url
+    } catch (err: unknown) {
+      setPortalError(err instanceof Error ? err.message : 'Something went wrong')
+      setPortalLoading(false)
+    }
+  }
+
   async function handleTestSource() {
     setTestingSource(true)
     setSourceTestResult(null)
@@ -1272,6 +1297,9 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           </div>
           <div className="text-[10px] text-white/40 font-[family-name:var(--font-dm-mono)] mb-3">
             {monthlyCharCount.toLocaleString()} / {CHARACTER_LIMIT.toLocaleString()} characters
+            {creditBalance > 0 && (
+              <span className="block text-[var(--accent)]/90">+{creditBalance.toLocaleString()} add-on credits</span>
+            )}
           </div>
           <a
             href="mailto:paul@localpod.co?subject=LocalPod%20Studio%20support"
@@ -1315,6 +1343,15 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 {me.shows.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             )}
+            {me && me.shows.length < showLimitForPlan(me.subscription?.plan) && (
+              <button
+                onClick={() => setActiveNav('shows')}
+                title="Add another podcast feed"
+                className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-light)] border border-[var(--rule)] rounded-[3px] px-2 py-1 hover:border-[var(--ink)] hover:text-[var(--ink)] transition-colors"
+              >
+                ＋ Add feed
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden sm:flex items-center gap-1.5 text-[12px] text-[var(--ink-light)] font-[family-name:var(--font-dm-mono)]">
@@ -1357,6 +1394,26 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                   </div>
                 ))}
               </div>
+
+              {/* Add-a-feed call-to-action — shown while below the plan's feed limit */}
+              {me.shows.length < showLimitForPlan(me.subscription?.plan) && (
+                <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5 mb-8 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-[family-name:var(--font-nunito)] font-bold text-[14px] text-[var(--ink)] mb-0.5">
+                      Add another podcast feed
+                    </div>
+                    <p className="text-[12px] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">
+                      Your plan includes {showLimitForPlan(me.subscription?.plan)} feeds — you&apos;re using {me.shows.length}.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveNav('shows')}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[2px] hover:bg-[#2a2825] transition-colors whitespace-nowrap"
+                  >
+                    ＋ Add feed
+                  </button>
+                </div>
+              )}
 
               {/* Recent episodes */}
               <div className="flex items-baseline justify-between mb-4">
@@ -1617,10 +1674,31 @@ const showNotesRef = useRef<HTMLDivElement>(null)
 
 
                     {limitExceeded && (
-                      <p className="text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)] mb-4">
-                        You've reached your 150,000 character limit for this month.{' '}
-                        <a href="mailto:paul@localpod.co" className="underline hover:opacity-70">Contact us to upgrade.</a>
-                      </p>
+                      <div className="border border-[var(--accent)]/40 bg-[var(--accent)]/[0.04] rounded-[6px] px-4 py-3 mb-4">
+                        <p className="text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)] mb-3">
+                          You&apos;ve used all {CHARACTER_LIMIT.toLocaleString()} characters
+                          {creditBalance > 0 ? ` and ${creditBalance.toLocaleString()} add-on credits` : ''} available this month.
+                          Buy more to keep generating — credits never expire.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleBuyCredits('25k')}
+                            disabled={portalLoading}
+                            className="px-3.5 py-1.5 bg-[var(--ink)] text-white text-[12px] font-semibold rounded-[4px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                          >
+                            +25,000 characters — $15
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBuyCredits('50k')}
+                            disabled={portalLoading}
+                            className="px-3.5 py-1.5 border border-[var(--rule)] text-[var(--ink)] text-[12px] font-semibold rounded-[4px] hover:border-[var(--ink)] disabled:opacity-50 transition-colors"
+                          >
+                            +50,000 characters — $25
+                          </button>
+                        </div>
+                      </div>
                     )}
                     {generateError && (
                       <p className="text-[12px] text-[var(--accent)] font-[family-name:var(--font-dm-mono)] mb-4">{generateError}</p>
@@ -1726,6 +1804,14 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           {/* ── BILLING ───────────────────────────────────────────────── */}
           {activeNav === 'billing' && (
             <div className="max-w-lg">
+              {creditsPurchased && (
+                <div className="bg-[#eef7ee] border border-[#cfe6cf] rounded-[8px] px-6 py-4 mb-4">
+                  <div className="text-[13px] text-[#2f6b2f]">
+                    <span className="font-semibold">Credits added.</span>{' '}
+                    Your add-on characters are now available below. If the balance hasn&apos;t updated yet, give it a moment and refresh.
+                  </div>
+                </div>
+              )}
               {cancelPending && (
                 <div className="bg-[#fdf6e9] border border-[#e8d9b5] rounded-[8px] px-6 py-4 mb-4">
                   <div className="text-[13px] text-[#7a5b1e]">
@@ -1762,16 +1848,44 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 ) : (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                    <div className="text-[13px] text-[var(--ink-light)]">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">Up to 4 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
                   </>
                 )}
               </div>
+
+              {!(isTrial && !me?.subscription?.stripeCustomerId) && (
+                <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
+                  <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Add-on Credits</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-1">
+                    Need more characters this month? Buy add-on credits instead of upgrading — they never expire and are used only after your monthly allowance runs out.
+                  </div>
+                  <div className="text-[13px] text-[var(--ink)] font-semibold mb-4">
+                    Current balance: {creditBalance.toLocaleString()} characters
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleBuyCredits('25k')}
+                      disabled={portalLoading}
+                      className="px-5 py-2.5 bg-[var(--ink)] text-white text-[13px] font-semibold rounded-[6px] hover:bg-[#2a2825] disabled:opacity-50 transition-colors"
+                    >
+                      +25,000 characters — $15
+                    </button>
+                    <button
+                      onClick={() => handleBuyCredits('50k')}
+                      disabled={portalLoading}
+                      className="px-5 py-2.5 border border-[var(--rule)] text-[var(--ink)] text-[13px] font-semibold rounded-[6px] hover:border-[var(--ink)] disabled:opacity-50 transition-colors"
+                    >
+                      +50,000 characters — $25
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {isTrial && !me?.subscription?.stripeCustomerId ? (
                 <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                   <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Subscribe</div>
                   <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
+                  <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 4 podcast feeds · 150,000 AI characters/month · RSS distribution · Unlimited ad campaigns · Priority support</div>
                   <button
                     onClick={handleCheckout}
                     disabled={portalLoading}
@@ -1790,7 +1904,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Upgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Publisher — $99/mo</div>
-                      <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 5 podcast feeds · 150,000 AI characters/month · Unlimited ad campaigns · Priority support</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">Up to 4 podcast feeds · 150,000 AI characters/month · Unlimited ad campaigns · Priority support</div>
                       <button
                         onClick={handlePortal}
                         disabled={portalLoading}

@@ -17,6 +17,7 @@ model Organization {
   subscription         Subscription?
   pronunciationRules   PronunciationRule[]
   adCampaigns          AdCampaign[]
+  creditPurchases      CreditPurchase[]
   defaultVoice         Voice?        @relation(fields: [defaultVoiceId], references: [id])
 }
 
@@ -148,4 +149,21 @@ model Subscription {
   createdAt            DateTime     @default(now())
   organizationId       String       @unique
   organization         Organization @relation(fields: [organizationId], references: [id])
+  // Non-expiring add-on TTS characters, consumed only after the monthly plan
+  // allowance is exhausted. Topped up by one-time credit-pack purchases and
+  // decremented at generation time. Rolls over across billing periods.
+  creditBalance        Int          @default(0)
+}
+
+// Audit trail + idempotency guard for one-time add-on credit purchases. Each
+// completed Stripe payment session credits Subscription.creditBalance exactly
+// once, keyed by the unique stripeSessionId (webhook retries are no-ops).
+model CreditPurchase {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  characters      Int
+  amountPaid      Int          // cents
+  stripeSessionId String       @unique
+  createdAt       DateTime     @default(now())
 }

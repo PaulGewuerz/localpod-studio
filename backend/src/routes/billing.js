@@ -3,6 +3,7 @@ const router = require('express').Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const prisma = require('../prisma');
 const requireActiveSubscription = require('../middleware/requireActiveSubscription');
+const { CREDIT_PACKS } = require('../utils/planLimits');
 
 const PRICE_IDS = {
   starter:   { monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,   annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID },
@@ -74,6 +75,47 @@ router.post('/portal-session', requireActiveSubscription, async (req, res) => {
       customer: subscription.stripeCustomerId,
       return_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/studio?nav=billing`,
     });
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// One-time purchase of an add-on credit pack (extra TTS characters that top up
+// the non-expiring Subscription.creditBalance). The pack's characters are stamped
+// into session metadata so the webhook can credit the balance idempotently.
+router.post('/buy-credits', requireActiveSubscription, async (req, res) => {
+  const { pack } = req.body;
+  const config = CREDIT_PACKS[pack];
+  if (!config) return res.status(400).json({ error: `Unknown credit pack: ${pack}` });
+
+  const priceId = process.env[config.priceEnv];
+  if (!priceId) return res.status(500).json({ error: `No Stripe price configured for pack=${pack}` });
+
+  const org = req.user.organization;
+  const subscription = org?.subscription;
+  const email = req.user.email;
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      // Attach to the existing Stripe customer when we have one so the purchase
+      // shows on their billing history; otherwise fall back to their email.
+      ...(subscription?.stripeCustomerId
+        ? { customer: subscription.stripeCustomerId }
+        : { customer_email: email }),
+      metadata: {
+        type: 'credits',
+        pack,
+        characters: String(config.characters),
+        organizationId: org.id,
+      },
+      success_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/studio?nav=billing&credits=success`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://app.localpod.co'}/studio?nav=billing`,
+    });
+
     res.json({ url: session.url });
   } catch (err) {
     res.status(500).json({ error: err.message });

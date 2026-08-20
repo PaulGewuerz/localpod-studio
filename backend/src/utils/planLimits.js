@@ -27,10 +27,10 @@ function characterLimitForPlan(plan) {
 const PLAN_SHOW_LIMITS = {
   starter: 1,
   solo: 1,
-  publisher: 3,
+  publisher: 4,
 };
 
-const DEFAULT_SHOW_LIMIT = 3;
+const DEFAULT_SHOW_LIMIT = 4;
 
 function showLimitForPlan(plan) {
   return PLAN_SHOW_LIMITS[plan] ?? DEFAULT_SHOW_LIMIT;
@@ -52,6 +52,28 @@ function adCampaignLimitForPlan(plan) {
   return PLAN_AD_CAMPAIGN_LIMITS[plan] ?? DEFAULT_AD_CAMPAIGN_LIMIT;
 }
 
+// Add-on credit packs: one-time purchases of extra TTS characters that top up
+// the non-expiring Subscription.creditBalance. Single source of truth for the
+// buy-credits route (routes/billing.js) and the webhook top-up (routes/webhooks.js).
+// `priceEnv` names the Stripe one-time price env var; `amount` is display-only (cents).
+const CREDIT_PACKS = {
+  '25k': { characters: 25_000, amount: 1_500, priceEnv: 'STRIPE_CREDITS_25K_PRICE_ID' },
+  '50k': { characters: 50_000, amount: 2_500, priceEnv: 'STRIPE_CREDITS_50K_PRICE_ID' },
+};
+
+// Characters still available to a generation: whatever's left of the monthly plan
+// allowance this period, plus the non-expiring add-on credit balance. The monthly
+// allowance is always spent first; `creditBalance` funds only the overflow beyond it.
+// Returns { monthlyRemaining, creditBalance, total } — `total` is the hard ceiling.
+function remainingAllowance({ characterLimit, usedChars, creditBalance = 0 }) {
+  const monthlyRemaining = Math.max(0, characterLimit - usedChars);
+  return {
+    monthlyRemaining,
+    creditBalance,
+    total: monthlyRemaining + creditBalance,
+  };
+}
+
 module.exports = {
   PLAN_CHARACTER_LIMITS,
   DEFAULT_CHARACTER_LIMIT,
@@ -62,4 +84,6 @@ module.exports = {
   PLAN_AD_CAMPAIGN_LIMITS,
   DEFAULT_AD_CAMPAIGN_LIMIT,
   adCampaignLimitForPlan,
+  CREDIT_PACKS,
+  remainingAllowance,
 };

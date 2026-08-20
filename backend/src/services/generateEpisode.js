@@ -5,7 +5,7 @@ const { normalizeForTTS } = require('../utils/normalizeText');
 const { cleanArticleText } = require('../utils/cleanArticleText');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { concatAudioBuffers } = require('../utils/stitchAudio');
-const { characterLimitForPlan } = require('../utils/planLimits');
+const { characterLimitForPlan, remainingAllowance } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -158,7 +158,7 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
     console.log('[TTS normalize] first 200 chars:', processedText.slice(0, 200));
   }
 
-  // Enforce monthly character limit
+  // Enforce monthly character limit, backed by any add-on credit balance.
   const now = new Date();
   const periodStart = org.subscription?.currentPeriodStart
     ?? new Date(now.getFullYear(), now.getMonth(), 1);
@@ -168,9 +168,16 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
   });
   const usedChars = usage._sum.characterCount ?? 0;
   const characterLimit = characterLimitForPlan(org.subscription?.plan);
-  if (usedChars + processedText.length > characterLimit) {
+  const { monthlyRemaining, total } = remainingAllowance({
+    characterLimit,
+    usedChars,
+    creditBalance: org.subscription?.creditBalance ?? 0,
+  });
+  if (processedText.length > total) {
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
+  // Characters beyond the monthly allowance are drawn from add-on credits, decremented after commit.
+  const creditsToConsume = Math.max(0, processedText.length - monthlyRemaining);
 
   // Long scripts are chunked across multiple TTS calls and stitched — no upper
   // length limit here beyond the monthly character cap enforced above.
@@ -199,7 +206,7 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
 
   const voice = await prisma.voice.findUnique({ where: { elevenLabsId: voiceElevenLabsId } });
 
-  return prisma.episode.create({
+  const episode = await prisma.episode.create({
     data: {
       id: episodeId,
       title: title || 'Untitled Episode',
@@ -213,6 +220,9 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
       ...(voice ? { voiceId: voice.id } : {}),
     },
   });
+
+  await consumeCredits(org, creditsToConsume);
+  return episode;
 }
 
 /**
@@ -353,7 +363,7 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
     offset += seg.length + SEPARATOR.length;
   });
 
-  // Enforce monthly character limit
+  // Enforce monthly character limit, backed by any add-on credit balance.
   const now = new Date();
   const periodStart = org.subscription?.currentPeriodStart
     ?? new Date(now.getFullYear(), now.getMonth(), 1);
@@ -363,9 +373,16 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
   });
   const usedChars = usage._sum.characterCount ?? 0;
   const characterLimit = characterLimitForPlan(org.subscription?.plan);
-  if (usedChars + processedText.length > characterLimit) {
+  const { monthlyRemaining, total } = remainingAllowance({
+    characterLimit,
+    usedChars,
+    creditBalance: org.subscription?.creditBalance ?? 0,
+  });
+  if (processedText.length > total) {
     throw new GenerationError('character_limit_exceeded', 'character_limit_exceeded', 402);
   }
+  // Characters beyond the monthly allowance are drawn from add-on credits, decremented after commit.
+  const creditsToConsume = Math.max(0, processedText.length - monthlyRemaining);
 
   const response = await fetch(`${ELEVENLABS_API_URL}/${voiceElevenLabsId}/with-timestamps`, {
     method: 'POST',
@@ -427,7 +444,7 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
     durationSec,
   });
 
-  return prisma.episode.create({
+  const episode = await prisma.episode.create({
     data: {
       id: episodeId,
       title: title || 'Untitled Episode',
@@ -442,6 +459,25 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
       ...(ads ? { adAssignments: JSON.stringify(ads.adAssignments), adMarkers: JSON.stringify(ads.adMarkers) } : {}),
     },
   });
+
+  await consumeCredits(org, creditsToConsume);
+  return episode;
+}
+
+// Decrement the org's non-expiring add-on credit balance once an episode has been
+// committed. `amount` is the portion of the script that exceeded the monthly plan
+// allowance (0 when the allowance covered it). Best-effort: a failure here must not
+// undo a successfully generated episode, so we log rather than throw.
+async function consumeCredits(org, amount) {
+  if (!amount || amount <= 0 || !org.subscription) return;
+  try {
+    await prisma.subscription.update({
+      where: { organizationId: org.id },
+      data: { creditBalance: { decrement: amount } },
+    });
+  } catch (err) {
+    console.error(`[credits] failed to decrement ${amount} for org ${org.id}:`, err.message);
+  }
 }
 
 module.exports = { generateDraftEpisode, generateDigestEpisode, synthesizeSpeech, GenerationError, MAX_TTS_CHARS };

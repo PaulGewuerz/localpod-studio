@@ -24,6 +24,43 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       // Fired when checkout completes — store customer/subscription IDs so
       // later events can look up the org by stripeCustomerId.
       case 'checkout.session.completed': {
+        // One-time add-on credit purchase: top up the non-expiring balance.
+        // Idempotent via CreditPurchase.stripeSessionId, so Stripe retries and
+        // duplicate deliveries never double-credit.
+        if (obj.mode === 'payment' && obj.metadata?.type === 'credits') {
+          const organizationId = obj.metadata.organizationId;
+          const characters = parseInt(obj.metadata.characters, 10);
+          if (organizationId && Number.isFinite(characters) && characters > 0) {
+            try {
+              await prisma.$transaction(async (tx) => {
+                await tx.creditPurchase.create({
+                  data: {
+                    organizationId,
+                    characters,
+                    amountPaid: obj.amount_total ?? 0,
+                    stripeSessionId: obj.id,
+                  },
+                });
+                await tx.subscription.update({
+                  where: { organizationId },
+                  data: { creditBalance: { increment: characters } },
+                });
+              });
+              sendSMS(`LocalPod credit purchase: ${obj.customer_details?.email ?? organizationId} bought ${characters.toLocaleString()} characters`)
+                .catch(err => console.error('Credit-purchase SMS failed:', err.message));
+            } catch (err) {
+              // Unique-constraint violation (P2002) means we already processed this
+              // session — expected on retries, safe to ignore. Anything else re-throws.
+              if (err.code === 'P2002') {
+                console.log(`Credit session ${obj.id} already processed — skipping.`);
+              } else {
+                throw err;
+              }
+            }
+          }
+          break;
+        }
+
         if (obj.mode === 'subscription' && obj.customer_email) {
           const user = await prisma.user.findFirst({
             where: { email: obj.customer_email },
