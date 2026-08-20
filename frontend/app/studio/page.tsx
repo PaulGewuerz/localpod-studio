@@ -94,14 +94,16 @@ const NAV_TITLES: Record<NavKey, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Per-plan cap on podcast feeds (shows). Starter/Solo = 1, everything else gets
-// the Publisher allowance of 4 (same fail-open convention as the backend: unknown/
-// null plans are NOT downgraded). This is a UI hint only — the real cap is
+// Per-plan cap on podcast feeds (shows). Starter = 1, Solo = 2, everything else
+// gets the Publisher allowance of 4 (same fail-open convention as the backend:
+// unknown/null plans are NOT downgraded). This is a UI hint only — the real cap is
 // enforced server-side by showLimitForPlan in backend/src/utils/planLimits.js
 // (the single source of truth). Keep this in sync with that file if the limits
 // change; the backend is authoritative.
 function showLimitForPlan(plan: string | null | undefined): number {
-  return plan === 'starter' || plan === 'solo' ? 1 : 4
+  if (plan === 'starter') return 1
+  if (plan === 'solo') return 2
+  return 4
 }
 
 async function getToken(): Promise<string> {
@@ -1843,7 +1845,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                 ) : isSolo ? (
                   <>
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
-                    <div className="text-[13px] text-[var(--ink-light)]">1 podcast feed · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
+                    <div className="text-[13px] text-[var(--ink-light)]">2 podcast feeds · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
                   </>
                 ) : (
                   <>
@@ -1917,7 +1919,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
                     <div className="bg-white border border-[var(--rule)] rounded-[8px] px-8 py-7 mb-4">
                       <div className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--ink-faint)] uppercase tracking-[0.08em] mb-1.5">Downgrade</div>
                       <div className="font-[family-name:var(--font-nunito)] font-bold text-lg text-[var(--ink)] mb-1">LocalPod Solo — $49/mo</div>
-                      <div className="text-[13px] text-[var(--ink-light)] mb-4">1 podcast feed · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
+                      <div className="text-[13px] text-[var(--ink-light)] mb-4">2 podcast feeds · 50,000 AI characters/month · 2 ad campaigns · RSS distribution</div>
                       <button
                         onClick={handlePortal}
                         disabled={portalLoading}

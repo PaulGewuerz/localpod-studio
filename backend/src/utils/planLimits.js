@@ -21,12 +21,13 @@ function characterLimitForPlan(plan) {
 // Per-plan cap on podcast feeds (shows). Same fail-open convention as the
 // character limits above: unknown/null/legacy plans get the Publisher allowance
 // so grandfathered accounts (plan = null) aren't capped at 1; only the explicit
-// lower tiers ('starter', 'solo') get the lower limit. NOTE: a Publisher mislabeled as 'solo' in the DB
-// would be wrongly capped at 1 — Subscription.plan is known to be unreliable, but
-// it can't be re-resolved per-request (live Stripe price is prod-only).
+// lower tiers ('starter' = 1, 'solo' = 2) get the lower limit. NOTE: a Publisher
+// mislabeled as 'solo' in the DB would be wrongly capped at 2 — Subscription.plan
+// is known to be unreliable, but it can't be re-resolved per-request (live Stripe
+// price is prod-only).
 const PLAN_SHOW_LIMITS = {
   starter: 1,
-  solo: 1,
+  solo: 2,
   publisher: 4,
 };
 
