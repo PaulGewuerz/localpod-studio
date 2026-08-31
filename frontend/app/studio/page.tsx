@@ -495,6 +495,8 @@ function StudioInner() {
   const [newShowName, setNewShowName] = useState('')
   const [creatingShow, setCreatingShow] = useState(false)
   const [addShowError, setAddShowError] = useState<string | null>(null)
+  const [coverUploadingId, setCoverUploadingId] = useState<string | null>(null)
+  const [coverError, setCoverError] = useState<string | null>(null)
   const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
   const [voices, setVoices] = useState<Voice[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
@@ -714,6 +716,47 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       setAddShowError(err instanceof Error ? err.message : 'Could not add show.')
     } finally {
       setCreatingShow(false)
+    }
+  }
+
+  // ── Change a show's cover photo directly from the Shows list ──────────────────
+  // Uploads per-show (the endpoint is scoped by showId), points the show at the
+  // new URL, and refreshes local state with a cache-busted URL so it shows at once.
+  async function updateShowCover(showId: string, file: File) {
+    setCoverError(null)
+    setCoverUploadingId(showId)
+    try {
+      const token = await getToken()
+      const uploadRes = await fetch(`${API_URL}/me/cover-art?showId=${encodeURIComponent(showId)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
+        body: file,
+      })
+      if (!uploadRes.ok) {
+        const d = await uploadRes.json().catch(() => ({}))
+        throw new Error(d.error ?? uploadRes.statusText)
+      }
+      const { url } = await uploadRes.json()
+
+      const patchRes = await fetch(`${API_URL}/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ showId, coverArtUrl: url }),
+      })
+      if (!patchRes.ok) {
+        const d = await patchRes.json().catch(() => ({}))
+        throw new Error(d.error ?? patchRes.statusText)
+      }
+
+      const cacheBustedUrl = `${url}?t=${Date.now()}`
+      setMe(prev => prev ? {
+        ...prev,
+        shows: prev.shows.map(s => s.id === showId ? { ...s, coverArtUrl: cacheBustedUrl } : s),
+      } : prev)
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Could not update cover photo.')
+    } finally {
+      setCoverUploadingId(null)
     }
   }
 
@@ -1959,22 +2002,46 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             const atLimit = me.shows.length >= showLimit
             return (
             <div className="max-w-xl space-y-3">
+              {coverError && (
+                <p className="text-[12px] text-red-500 font-[family-name:var(--font-dm-mono)]">{coverError}</p>
+              )}
               {me.shows.length === 0 ? (
                 <p className="text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No show found.</p>
               ) : me.shows.map(show => (
                 <div key={show.id} className={`bg-white border rounded-[2px] p-6 flex gap-6 items-start cursor-pointer transition-colors ${show.id === activeShowId ? 'border-[var(--ink)]' : 'border-[var(--rule)] hover:border-gray-300'}`} onClick={() => setActiveShowId(show.id)}>
-                  {show.coverArtUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={show.coverArtUrl}
-                      alt={show.name}
-                      className="w-20 h-20 rounded-[2px] object-cover shrink-0 border border-[var(--rule)]"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 rounded-[2px] bg-[var(--bg-warm)] border border-[var(--rule)] shrink-0 flex items-center justify-center text-[var(--ink-faint)] text-xs font-[family-name:var(--font-dm-mono)]">
-                      No art
+                  {/* Cover art — hover to replace it, per show */}
+                  <label
+                    className="relative shrink-0 cursor-pointer group/cover block"
+                    title="Change cover photo"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {show.coverArtUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={show.coverArtUrl}
+                        alt={show.name}
+                        className="w-20 h-20 rounded-[2px] object-cover border border-[var(--rule)]"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-[2px] bg-[var(--bg-warm)] border border-[var(--rule)] flex items-center justify-center text-[var(--ink-faint)] text-xs font-[family-name:var(--font-dm-mono)]">
+                        No art
+                      </div>
+                    )}
+                    <div className="absolute inset-0 rounded-[2px] bg-black/50 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] leading-tight font-[family-name:var(--font-dm-mono)] text-center px-1">
+                      {coverUploadingId === show.id ? 'Uploading…' : 'Change photo'}
                     </div>
-                  )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      disabled={coverUploadingId === show.id}
+                      onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) updateShowCover(show.id, f)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
                   <div className="min-w-0">
                     <div className="font-[family-name:var(--font-nunito)] font-bold text-[15px] text-[var(--ink)] mb-1">
                       {show.name}
