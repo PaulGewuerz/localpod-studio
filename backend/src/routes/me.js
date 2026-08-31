@@ -222,6 +222,41 @@ router.patch('/', async (req, res) => {
           await hosting.updatePodcast(show.megaphoneShowId, megaphoneUpdates);
         }
 
+        // Realign the feed URL slug with the title. The slug is frozen at
+        // provision time — often from the "Untitled Show" placeholder when a
+        // show is created before it's named — and a later rename updates the
+        // title but not the public feed URL. Only touch a slug that's still the
+        // auto-generated placeholder: a meaningful slug is one the user may have
+        // already submitted to Apple/Spotify, and changing that URL would break
+        // those listings.
+        if (showName !== undefined) {
+          const pod = await hosting.getPodcast(show.megaphoneShowId);
+          const currentSlug = pod.feedUrl ? pod.feedUrl.split('/').pop() : '';
+          const isPlaceholderSlug = currentSlug === 'untitled-show' || currentSlug.startsWith('untitled-show-');
+          const base = showName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'show';
+          const idSuffix = String(show.id).replace(/[^a-z0-9]/gi, '').slice(-6).toLowerCase();
+          if (isPlaceholderSlug && base !== 'untitled-show' && currentSlug !== base && currentSlug !== `${base}-${idSuffix}`) {
+            for (const slug of [base, `${base}-${idSuffix}`]) {
+              try {
+                await hosting.updatePodcast(show.megaphoneShowId, { slug });
+                break;
+              } catch (err) {
+                const conflict = err.status === 422 || /slug|taken|already|exist/i.test(err.message || '');
+                if (!conflict) { console.error('Slug update failed:', err.message); break; }
+              }
+            }
+            // Persist the resulting feed URL (Megaphone may have suffixed the slug).
+            try {
+              const updated = await hosting.getPodcast(show.megaphoneShowId);
+              if (updated.feedUrl) {
+                await prisma.show.update({ where: { id: show.id }, data: { megaphoneRssUrl: updated.feedUrl } });
+              }
+            } catch (err) {
+              console.error('Feed URL refresh after slug change failed:', err.message);
+            }
+          }
+        }
+
         if (coverArtUrl !== undefined) {
           await hosting.uploadPodcastCoverArt(show.megaphoneShowId, coverArtUrl);
         }
@@ -235,11 +270,20 @@ router.patch('/', async (req, res) => {
 });
 
 // POST /me/cover-art — upload cover art via service role (bypasses RLS)
+// Scoped per show: the storage path includes the show id so each feed keeps its
+// own cover file. (A shared `${orgId}/cover.ext` path made every show in an org
+// point at the same object — uploading one show's cover overwrote the others'.)
 router.post('/cover-art', express.raw({ type: ['image/jpeg', 'image/png'], limit: '10mb' }), async (req, res) => {
   const orgId = req.user.organization.id;
   const contentType = req.headers['content-type'] || 'image/jpeg';
   const ext = contentType.includes('png') ? 'png' : 'jpg';
-  const path = `${orgId}/cover.${ext}`;
+
+  const show = req.query.showId
+    ? await prisma.show.findFirst({ where: { id: String(req.query.showId), organizationId: orgId } })
+    : await prisma.show.findFirst({ where: { organizationId: orgId }, orderBy: { createdAt: 'asc' } });
+  if (!show) return res.status(404).json({ error: 'Show not found' });
+
+  const path = `${orgId}/${show.id}/cover.${ext}`;
 
   const { error } = await supabaseAdmin.storage
     .from('cover-art')

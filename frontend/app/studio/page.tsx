@@ -1049,7 +1049,10 @@ const showNotesRef = useRef<HTMLDivElement>(null)
       let coverArtUrl: string | undefined
 
       if (settingsCoverFile) {
-        const uploadRes = await fetch(`${API_URL}/me/cover-art`, {
+        const coverArtEndpoint = activeShowId
+          ? `${API_URL}/me/cover-art?showId=${encodeURIComponent(activeShowId)}`
+          : `${API_URL}/me/cover-art`
+        const uploadRes = await fetch(coverArtEndpoint, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': settingsCoverFile.type },
           body: settingsCoverFile,
