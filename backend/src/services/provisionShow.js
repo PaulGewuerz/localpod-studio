@@ -21,6 +21,24 @@ async function provisionMegaphoneShow(show, { fallbackTitle } = {}) {
 
   const adapter = getHostingAdapter();
   const showTitle = show.name ?? fallbackTitle ?? 'Untitled Show';
+
+  // Megaphone registers this address as the podcast owner. It's where Apple,
+  // Spotify, and the other directories send their one-time verification codes
+  // when the customer submits their feed. It MUST be the customer's email — if
+  // it's ours, we receive every customer's confirmation emails (not
+  // sustainable). Use the org's account holder (its earliest-created user);
+  // fall back to the platform address only if the org somehow has no user.
+  let ownerEmail = 'paul@localpod.co';
+  const owner = await prisma.user.findFirst({
+    where: { organizationId: show.organizationId },
+    orderBy: { createdAt: 'asc' },
+    select: { email: true },
+  });
+  if (owner?.email) {
+    ownerEmail = owner.email;
+  } else {
+    console.warn(`provisionMegaphoneShow: no user found for org ${show.organizationId}; falling back to ${ownerEmail} as Megaphone owner email`);
+  }
   const baseSlug = showTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'show';
 
   // Megaphone slugs must be unique across the network. Two shows with the same
@@ -42,7 +60,7 @@ async function provisionMegaphoneShow(show, { fallbackTitle } = {}) {
         category: show.category,
         author: show.author || showTitle,
         ownerName: show.author || showTitle,
-        ownerEmail: 'paul@localpod.co',
+        ownerEmail,
       });
       break;
     } catch (err) {
