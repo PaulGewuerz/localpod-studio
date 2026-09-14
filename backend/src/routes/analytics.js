@@ -48,15 +48,22 @@ router.get('/', async (req, res) => {
       showCounts = counts;
     }
 
-    const normalized = (Array.isArray(episodes) ? episodes : []).map(ep => ({
-      id: internalIdByMegaphone[ep.id] ?? null,
-      megaphoneId: ep.id,
-      title: ep.title,
-      pubdate: ep.pubdate,
-      duration: ep.duration,
-      downloads: downloadsByGuid[ep.guid]?.downloadsAll ?? 0,
-      downloads30: downloadsByGuid[ep.guid]?.downloads30 ?? null,
-    }));
+    const normalized = (Array.isArray(episodes) ? episodes : []).map(ep => {
+      // OP3 keys episodes by the RSS <item> guid. Megaphone leaves the episode
+      // object's `guid` field null and publishes its `id` as the feed guid, so
+      // OP3's itemGuid matches ep.id, not ep.guid. Prefer guid when present
+      // (other feeds may set it), fall back to id.
+      const oc = downloadsByGuid[ep.guid] ?? downloadsByGuid[ep.id];
+      return {
+        id: internalIdByMegaphone[ep.id] ?? null,
+        megaphoneId: ep.id,
+        title: ep.title,
+        pubdate: ep.pubdate,
+        duration: ep.duration,
+        downloads: oc?.downloadsAll ?? 0,
+        downloads30: oc?.downloads30 ?? null,
+      };
+    });
 
     res.json({
       available: true,
