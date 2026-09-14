@@ -382,7 +382,16 @@ function AnalyticsView({ showId }: { showId: string | null }) {
     <div>
       {/* Stat cards */}
       {hasDownloadData && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">This Month</div>
+            <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
+              {data.monthlyDownloads != null ? data.monthlyDownloads.toLocaleString() : '—'}
+            </div>
+            <div className="text-[11px] text-[var(--green)] font-[family-name:var(--font-dm-mono)]">
+              {data.asof ? `As of ${fmtDate(data.asof)}` : 'Downloads (30 days)'}
+            </div>
+          </div>
           <div className="bg-white border border-[var(--rule)] rounded-[2px] p-5">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)]">Total Downloads</div>
             <div className="font-[family-name:var(--font-nunito)] text-[28px] font-bold leading-none my-1.5 text-[var(--ink)]">
