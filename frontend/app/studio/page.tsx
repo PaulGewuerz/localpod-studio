@@ -424,28 +424,26 @@ function AnalyticsView({ showId }: { showId: string | null }) {
           <span className="font-[family-name:var(--font-nunito)] font-bold text-[14px] text-[var(--ink)]">
             {hasDownloadData ? 'Downloads by Episode' : 'Episodes'}
           </span>
-          {!hasDownloadData && (
-            <button
-              onClick={async () => {
-                setRequesting(true)
-                try {
-                  const token = await getToken()
-                  await fetch(`${API_URL}/analytics/request-report`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ showId }),
-                  })
-                  setRequested(true)
-                } finally {
-                  setRequesting(false)
-                }
-              }}
-              disabled={requesting || requested}
-              className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] hover:opacity-70 disabled:opacity-50 transition-opacity"
-            >
-              {requested ? 'Request sent ✓' : requesting ? 'Sending…' : 'Request analytics report'}
-            </button>
-          )}
+          <button
+            onClick={async () => {
+              setRequesting(true)
+              try {
+                const token = await getToken()
+                await fetch(`${API_URL}/analytics/request-report`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ showId }),
+                })
+                setRequested(true)
+              } finally {
+                setRequesting(false)
+              }
+            }}
+            disabled={requesting || requested}
+            className="text-[11px] font-[family-name:var(--font-dm-mono)] text-[var(--accent)] hover:opacity-70 disabled:opacity-50 transition-opacity"
+          >
+            {requested ? 'Request sent ✓' : requesting ? 'Sending…' : 'Request full report'}
+          </button>
         </div>
         {episodes.length === 0 ? (
           <p className="px-5 py-8 text-[var(--ink-faint)] font-[family-name:var(--font-dm-mono)] text-[13px]">No episodes yet.</p>
