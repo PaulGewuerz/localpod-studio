@@ -42,10 +42,19 @@ router.get('/usage', async (req, res) => {
     where: { show: { organizationId: orgId }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
   });
+  // Next date the monthly allowance resets: the first monthly anniversary of the
+  // period start that lands in the future. Advancing month-by-month keeps the
+  // date sensible even if currentPeriodStart is briefly stale, and yields the
+  // first of next month for the no-subscription fallback above.
+  const resetsAt = new Date(periodStart);
+  while (resetsAt <= now) {
+    resetsAt.setMonth(resetsAt.getMonth() + 1);
+  }
   res.json({
     monthlyCharacters: usage._sum.characterCount ?? 0,
     characterLimit: characterLimitForPlan(subscription?.plan),
     creditBalance: subscription?.creditBalance ?? 0,
+    resetsAt: resetsAt.toISOString(),
   });
 });
 

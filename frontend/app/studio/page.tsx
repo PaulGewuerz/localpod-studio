@@ -512,6 +512,7 @@ function StudioInner() {
   const [monthlyCharacters, setMonthlyCharacters] = useState(0)
   const [characterLimit, setCharacterLimit] = useState<number | null>(null)
   const [creditBalance, setCreditBalance] = useState(0)
+  const [resetsAt, setResetsAt] = useState<string | null>(null)
   const [creditsPurchased, setCreditsPurchased] = useState(false)
 
   // New Episode form state
@@ -671,6 +672,7 @@ const showNotesRef = useRef<HTMLDivElement>(null)
           setMonthlyCharacters(data.monthlyCharacters)
           if (typeof data.characterLimit === 'number') setCharacterLimit(data.characterLimit)
           if (typeof data.creditBalance === 'number') setCreditBalance(data.creditBalance)
+          if (typeof data.resetsAt === 'string') setResetsAt(data.resetsAt)
         }
       } catch { /* silent */ }
       finally { setLoadingEpisodes(false) }
@@ -1354,6 +1356,11 @@ const showNotesRef = useRef<HTMLDivElement>(null)
             {monthlyCharCount.toLocaleString()} / {CHARACTER_LIMIT.toLocaleString()} characters
             {creditBalance > 0 && (
               <span className="block text-[var(--accent)]/90">+{creditBalance.toLocaleString()} add-on credits</span>
+            )}
+            {resetsAt && (
+              <span className="block text-white/30">
+                Resets {new Date(resetsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
             )}
           </div>
           <a
