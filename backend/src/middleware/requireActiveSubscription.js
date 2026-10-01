@@ -23,5 +23,6 @@ module.exports = async function requireActiveSubscription(req, res, next) {
 
   req.user = dbUser;
   if (result.impersonatedBy) req.impersonatedBy = result.impersonatedBy;
+  if (result.apiKeyId) req.apiKeyId = result.apiKeyId;
   next();
 };

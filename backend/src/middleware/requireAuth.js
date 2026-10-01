@@ -8,5 +8,6 @@ module.exports = async function requireAuth(req, res, next) {
 
   req.user = result.dbUser;
   if (result.impersonatedBy) req.impersonatedBy = result.impersonatedBy;
+  if (result.apiKeyId) req.apiKeyId = result.apiKeyId;
   next();
 };

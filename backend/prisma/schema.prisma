@@ -18,6 +18,7 @@ model Organization {
   pronunciationRules   PronunciationRule[]
   adCampaigns          AdCampaign[]
   creditPurchases      CreditPurchase[]
+  apiKeys              ApiKey[]
   defaultVoice         Voice?        @relation(fields: [defaultVoiceId], references: [id])
 }
 
@@ -166,4 +167,23 @@ model CreditPurchase {
   amountPaid      Int          // cents
   stripeSessionId String       @unique
   createdAt       DateTime     @default(now())
+}
+
+// Machine-to-machine credentials for programmatic API access (partner
+// integrations). Each key authenticates as its owning Organization; the raw
+// key is shown once at creation and only its sha256 hash is stored here.
+// scopes is reserved for future per-key permissions and is not yet enforced.
+model ApiKey {
+  id             String       @id @default(uuid())
+  name           String       // human label, e.g. "Acme Group production"
+  keyPrefix      String       // first 16 chars of the key, for display only
+  keyHash        String       @unique // sha256 hex of the full key
+  scopes         String[]     @default([])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
