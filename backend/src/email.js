@@ -148,6 +148,47 @@ async function sendCancellationAdminEmail({ orgName, showName, userEmail, access
   });
 }
 
+// Daily digest to the admin when one or more active, Stripe-backed subscriptions
+// have a billing anchor (currentPeriodStart) that has stopped advancing — the
+// signal that Stripe invoice webhooks aren't arriving. Usage still resets on its
+// own (resolveBillingPeriod rolls the anchor forward), so this is informational,
+// not a customer-facing failure. Sent only when `rows` is non-empty.
+async function sendStaleAnchorAdminEmail({ rows, thresholdDays }) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
+  const list = rows.map(r => `
+        <tr>
+          <td style="padding:6px 12px;border-bottom:1px solid #eee">${r.orgName}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #eee">${r.userEmail}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #eee">${r.plan || '—'}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #eee">${r.staleDesc}</td>
+        </tr>`).join('');
+  await resend.emails.send({
+    from: FROM,
+    to: adminEmail,
+    subject: `⚠️ ${rows.length} subscription${rows.length === 1 ? '' : 's'} with a stale billing anchor`,
+    html: `
+      <div style="font-family:sans-serif;max-width:640px;margin:0 auto;color:#111">
+        <h1 style="font-size:18px;font-weight:600;margin-bottom:8px">Stale billing anchors detected</h1>
+        <p style="color:#555;margin-bottom:16px">
+          The following active subscriptions haven't had their <code>currentPeriodStart</code>
+          advanced in over ${thresholdDays} days. For a monthly plan this usually means Stripe
+          <strong>invoice.payment_succeeded</strong> webhooks aren't being delivered — worth checking
+          the Stripe webhook logs. (Monthly usage still resets automatically, so customers aren't
+          blocked; this is a billing-plumbing heads-up. 100%-off comps will also show here.)
+        </p>
+        <table style="border-collapse:collapse;width:100%;font-size:13px;color:#333">
+          <tr style="text-align:left;color:#888">
+            <th style="padding:6px 12px">Org</th><th style="padding:6px 12px">Customer</th>
+            <th style="padding:6px 12px">Plan</th><th style="padding:6px 12px">Anchor</th>
+          </tr>
+          ${list}
+        </table>
+        <p style="color:#999;font-size:12px;margin-top:40px">LocalPod Studio</p>
+      </div>
+    `,
+  });
+}
+
 async function sendAnalyticsReportRequest({ orgName, showName, userEmail }) {
   const adminEmail = process.env.ADMIN_EMAIL || 'paul@localpod.co';
   await resend.emails.send({
@@ -255,4 +296,4 @@ async function addContactToAudience({ email, firstName, lastName }) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendNewSignupAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, sendEpisodeReadyEmail, addContactToAudience };
+module.exports = { sendWelcomeEmail, sendTrialEndingEmail, sendCancellationEmail, sendCancellationAdminEmail, sendNewSignupAdminEmail, sendStaleAnchorAdminEmail, sendAnalyticsReportRequest, sendDistributionRequestConfirmation, sendDistributionRequestAdmin, sendEpisodeReadyEmail, addContactToAudience };

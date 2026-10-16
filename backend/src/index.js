@@ -52,3 +52,4 @@ app.listen(PORT, () => {
 });
 
 require('./automation/feedPoller').startFeedPoller();
+require('./automation/staleAnchorMonitor').startStaleAnchorMonitor();
