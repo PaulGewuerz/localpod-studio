@@ -7,7 +7,7 @@ const { spliceSegment, extractSegment, removeSegment } = require('../utils/stitc
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { preparePublishAudio } = require('../utils/preparePublishAudio');
 const { getHostingAdapter } = require('../adapters/hosting');
-const { characterLimitForPlan } = require('../utils/planLimits');
+const { characterLimitForPlan, resolveBillingPeriod } = require('../utils/planLimits');
 const { synthesizeSpeech } = require('../services/generateEpisode');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -36,20 +36,11 @@ router.get('/usage', async (req, res) => {
   const orgId = req.user.organization.id;
   const now = new Date();
   const subscription = await prisma.subscription.findUnique({ where: { organizationId: orgId } });
-  const periodStart = subscription?.currentPeriodStart
-    ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const { periodStart, resetsAt } = resolveBillingPeriod(subscription?.currentPeriodStart, now);
   const usage = await prisma.episode.aggregate({
     where: { show: { organizationId: orgId }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
   });
-  // Next date the monthly allowance resets: the first monthly anniversary of the
-  // period start that lands in the future. Advancing month-by-month keeps the
-  // date sensible even if currentPeriodStart is briefly stale, and yields the
-  // first of next month for the no-subscription fallback above.
-  const resetsAt = new Date(periodStart);
-  while (resetsAt <= now) {
-    resetsAt.setMonth(resetsAt.getMonth() + 1);
-  }
   res.json({
     monthlyCharacters: usage._sum.characterCount ?? 0,
     characterLimit: characterLimitForPlan(subscription?.plan),

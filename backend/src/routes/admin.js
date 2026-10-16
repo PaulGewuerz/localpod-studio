@@ -4,6 +4,7 @@ const prisma = require('../prisma');
 const { supabase, supabaseAdmin } = require('../supabase');
 const { getHostingAdapter } = require('../adapters/hosting');
 const { provisionMegaphoneShow } = require('../services/provisionShow');
+const { resolveBillingPeriod } = require('../utils/planLimits');
 // GET /admin/publishers — list all orgs with episode stats
 router.get('/publishers', async (req, res) => {
   const orgs = await prisma.organization.findMany({
@@ -27,8 +28,6 @@ router.get('/publishers', async (req, res) => {
 
   const showIds = orgs.flatMap(o => o.shows.map(s => s.id));
   const now = new Date();
-  // Fallback only — matches routes/episodes.js /usage for orgs with no subscription.
-  const fallbackPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [totalStats, latestEpisodes] = await Promise.all([
     prisma.episode.groupBy({
@@ -52,7 +51,7 @@ router.get('/publishers', async (req, res) => {
   await Promise.all(orgs.map(async (org) => {
     const orgShowIds = org.shows.map(s => s.id);
     if (orgShowIds.length === 0) return;
-    const periodStart = org.subscription?.currentPeriodStart ?? fallbackPeriodStart;
+    const { periodStart } = resolveBillingPeriod(org.subscription?.currentPeriodStart, now);
     const stats = await prisma.episode.groupBy({
       by: ['showId'],
       where: { showId: { in: orgShowIds }, createdAt: { gte: periodStart } },

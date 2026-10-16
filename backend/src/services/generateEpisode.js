@@ -5,7 +5,7 @@ const { normalizeForTTS } = require('../utils/normalizeText');
 const { cleanArticleText } = require('../utils/cleanArticleText');
 const { splitIntoParagraphs, computeParagraphMeta } = require('../utils/paragraphMeta');
 const { concatAudioBuffers } = require('../utils/stitchAudio');
-const { characterLimitForPlan, remainingAllowance } = require('../utils/planLimits');
+const { characterLimitForPlan, remainingAllowance, resolveBillingPeriod } = require('../utils/planLimits');
 
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const AUDIO_BUCKET = 'audio';
@@ -160,8 +160,7 @@ async function generateDraftEpisode({ org, show, voiceElevenLabsId, articleText,
 
   // Enforce monthly character limit, backed by any add-on credit balance.
   const now = new Date();
-  const periodStart = org.subscription?.currentPeriodStart
-    ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const { periodStart } = resolveBillingPeriod(org.subscription?.currentPeriodStart, now);
   const usage = await prisma.episode.aggregate({
     where: { show: { organizationId: org.id }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },
@@ -365,8 +364,7 @@ async function generateDigestEpisode({ org, show, voiceElevenLabsId, segments, t
 
   // Enforce monthly character limit, backed by any add-on credit balance.
   const now = new Date();
-  const periodStart = org.subscription?.currentPeriodStart
-    ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const { periodStart } = resolveBillingPeriod(org.subscription?.currentPeriodStart, now);
   const usage = await prisma.episode.aggregate({
     where: { show: { organizationId: org.id }, createdAt: { gte: periodStart }, characterCount: { not: null } },
     _sum: { characterCount: true },

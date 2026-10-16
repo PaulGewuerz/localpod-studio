@@ -62,6 +62,37 @@ const CREDIT_PACKS = {
   '50k': { characters: 50_000, amount: 2_500, priceEnv: 'STRIPE_CREDITS_50K_PRICE_ID' },
 };
 
+// Resolve the *current* monthly usage window from a stored billing anchor.
+//
+// Usage is summed over episodes created since the period start, so the window
+// must advance every month for the allowance to reset. We can't rely on the
+// stored Subscription.currentPeriodStart to be current: it's only ever bumped
+// by a paid Stripe invoice webhook, so comped/test accounts, 100%-off coupons,
+// or a single missed webhook leave it frozen and usage accumulates forever.
+//
+// Instead we roll the anchor forward by whole months to the most recent
+// anniversary on or before `now` (`periodStart`), with the next anniversary as
+// `resetsAt`. This is monotonic-forward and a no-op for healthy subscriptions
+// whose anchor is already in the current period — it only un-freezes stale
+// anchors. A null anchor falls back to the first of the calendar month (which
+// already rolls monthly on its own). Single source of truth for the usage
+// endpoint, the admin dashboard, and both generation guards.
+function resolveBillingPeriod(currentPeriodStart, now) {
+  let periodStart = currentPeriodStart
+    ? new Date(currentPeriodStart)
+    : new Date(now.getFullYear(), now.getMonth(), 1);
+  // Advance by whole months while the *next* anniversary is still in the past.
+  while (true) {
+    const next = new Date(periodStart);
+    next.setMonth(next.getMonth() + 1);
+    if (next > now) break;
+    periodStart = next;
+  }
+  const resetsAt = new Date(periodStart);
+  resetsAt.setMonth(resetsAt.getMonth() + 1);
+  return { periodStart, resetsAt };
+}
+
 // Characters still available to a generation: whatever's left of the monthly plan
 // allowance this period, plus the non-expiring add-on credit balance. The monthly
 // allowance is always spent first; `creditBalance` funds only the overflow beyond it.
@@ -79,6 +110,7 @@ module.exports = {
   PLAN_CHARACTER_LIMITS,
   DEFAULT_CHARACTER_LIMIT,
   characterLimitForPlan,
+  resolveBillingPeriod,
   PLAN_SHOW_LIMITS,
   DEFAULT_SHOW_LIMIT,
   showLimitForPlan,
