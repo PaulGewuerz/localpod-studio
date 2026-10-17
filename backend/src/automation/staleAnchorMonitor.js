@@ -1,4 +1,5 @@
 const prisma = require('../prisma');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { sendStaleAnchorAdminEmail } = require('../email');
 const { sendSMS } = require('../notify');
 
@@ -15,6 +16,31 @@ const STALE_DAYS = 35;
 const NULL_GRACE_DAYS = 2;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Ask Stripe whether this subscription actually bills real money. A 100%-off
+ * comp (or a $0-priced plan) never produces a paid invoice, so the
+ * invoice.payment_succeeded webhook — guarded on `amount_paid > 0` — never sets
+ * currentPeriodStart. That leaves the anchor null forever *by design*, not
+ * because a webhook was dropped, so these subs shouldn't alert.
+ *
+ * We look at the most recent invoice: `amount_paid > 0` means money actually
+ * changed hands, so a frozen anchor there is a genuine missed-webhook signal
+ * worth surfacing. On any Stripe error (or if the sub has no invoice yet) we
+ * fail safe and treat it as real — better a noisy alert than a silently hidden
+ * billing problem.
+ */
+async function isComped(stripeSubscriptionId) {
+  try {
+    const invoices = await stripe.invoices.list({ subscription: stripeSubscriptionId, limit: 1 });
+    const latest = invoices.data[0];
+    if (!latest) return false;        // no invoice yet — don't assume comp
+    return latest.amount_paid === 0;  // fully discounted / $0 → benign comp
+  } catch (err) {
+    console.error(`[stale-anchor-monitor] Stripe check failed for ${stripeSubscriptionId}: ${err.message}`);
+    return false;                     // fail safe: keep it in the alert
+  }
+}
 
 /**
  * Find active, Stripe-backed subscriptions whose billing anchor has stopped
@@ -40,13 +66,19 @@ async function findStaleAnchors(now = new Date()) {
     include: { organization: { include: { users: { select: { email: true }, take: 1 } } } },
   });
 
-  return subs.map((s) => {
+  const rows = [];
+  for (const s of subs) {
+    // Skip fully-comped / 100%-off subs: their anchor is null by design, not
+    // because a webhook was dropped, so alerting on them is pure noise.
+    if (await isComped(s.stripeSubscriptionId)) continue;
+
     const email = s.organization.users[0]?.email ?? 'unknown';
     const staleDesc = s.currentPeriodStart
       ? `${Math.floor((now - s.currentPeriodStart) / DAY_MS)}d stale (since ${s.currentPeriodStart.toISOString().slice(0, 10)})`
       : `never set (sub created ${s.createdAt.toISOString().slice(0, 10)})`;
-    return { orgName: s.organization.name, userEmail: email, plan: s.plan, staleDesc };
-  });
+    rows.push({ orgName: s.organization.name, userEmail: email, plan: s.plan, staleDesc });
+  }
+  return rows;
 }
 
 async function checkStaleAnchors() {

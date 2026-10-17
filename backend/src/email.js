@@ -174,7 +174,8 @@ async function sendStaleAnchorAdminEmail({ rows, thresholdDays }) {
           advanced in over ${thresholdDays} days. For a monthly plan this usually means Stripe
           <strong>invoice.payment_succeeded</strong> webhooks aren't being delivered — worth checking
           the Stripe webhook logs. (Monthly usage still resets automatically, so customers aren't
-          blocked; this is a billing-plumbing heads-up. 100%-off comps will also show here.)
+          blocked; this is a billing-plumbing heads-up. Fully-comped / 100%-off subscriptions are
+          excluded, so everything here bills real money.)
         </p>
         <table style="border-collapse:collapse;width:100%;font-size:13px;color:#333">
           <tr style="text-align:left;color:#888">
