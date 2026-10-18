@@ -18,27 +18,31 @@ const NULL_GRACE_DAYS = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Ask Stripe whether this subscription actually bills real money. A 100%-off
- * comp (or a $0-priced plan) never produces a paid invoice, so the
- * invoice.payment_succeeded webhook — guarded on `amount_paid > 0` — never sets
- * currentPeriodStart. That leaves the anchor null forever *by design*, not
- * because a webhook was dropped, so these subs shouldn't alert.
+ * Confirm a DB-flagged sub against Stripe before alerting. currentPeriodStart
+ * is only ever advanced by an invoice.payment_succeeded webhook, so the real
+ * question is: does Stripe have a *paid* invoice whose period is newer than the
+ * anchor we stored? If so, we dropped or mishandled that webhook — a genuine
+ * plumbing failure — and we return the correct period so the alert is
+ * actionable and backfillable.
  *
- * We look at the most recent invoice: `amount_paid > 0` means money actually
- * changed hands, so a frozen anchor there is a genuine missed-webhook signal
- * worth surfacing. On any Stripe error (or if the sub has no invoice yet) we
- * fail safe and treat it as real — better a noisy alert than a silently hidden
- * billing problem.
+ * If Stripe shows no paid invoice at all (a real trial, a free/$0 price, or a
+ * partial- or 100%-off promo period that hasn't produced a paid invoice yet),
+ * a null/old anchor is expected rather than dropped, so we stay quiet. On any
+ * Stripe error we fail safe and alert. Note this makes no assumption about the
+ * discount — only about whether money Stripe collected went unrecorded.
  */
-async function isComped(stripeSubscriptionId) {
+async function stripeAnchorCheck(sub) {
   try {
-    const invoices = await stripe.invoices.list({ subscription: stripeSubscriptionId, limit: 1 });
-    const latest = invoices.data[0];
-    if (!latest) return false;        // no invoice yet — don't assume comp
-    return latest.amount_paid === 0;  // fully discounted / $0 → benign comp
+    const invoices = await stripe.invoices.list({ subscription: sub.stripeSubscriptionId, limit: 5 });
+    const paid = invoices.data.find((inv) => inv.amount_paid > 0 && inv.period_start);
+    if (!paid) return { alert: false };  // no payment collected yet — anchor legitimately unset
+    const stripeStart = new Date(paid.period_start * 1000);
+    const ours = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : null;
+    if (ours && ours >= stripeStart) return { alert: false };  // anchor already current
+    return { alert: true, stripeStart };  // we're behind Stripe → missed payment webhook
   } catch (err) {
-    console.error(`[stale-anchor-monitor] Stripe check failed for ${stripeSubscriptionId}: ${err.message}`);
-    return false;                     // fail safe: keep it in the alert
+    console.error(`[stale-anchor-monitor] Stripe check failed for ${sub.stripeSubscriptionId}: ${err.message}`);
+    return { alert: true };  // fail safe: surface it rather than hide a real problem
   }
 }
 
@@ -68,14 +72,18 @@ async function findStaleAnchors(now = new Date()) {
 
   const rows = [];
   for (const s of subs) {
-    // Skip fully-comped / 100%-off subs: their anchor is null by design, not
-    // because a webhook was dropped, so alerting on them is pure noise.
-    if (await isComped(s.stripeSubscriptionId)) continue;
+    // The DB pre-filter only says "our anchor looks stale". Confirm against
+    // Stripe and alert only when a payment we failed to record exists.
+    const check = await stripeAnchorCheck(s);
+    if (!check.alert) continue;
 
     const email = s.organization.users[0]?.email ?? 'unknown';
-    const staleDesc = s.currentPeriodStart
+    const paidSince = check.stripeStart
+      ? ` — Stripe shows paid period since ${check.stripeStart.toISOString().slice(0, 10)}`
+      : '';
+    const staleDesc = (s.currentPeriodStart
       ? `${Math.floor((now - s.currentPeriodStart) / DAY_MS)}d stale (since ${s.currentPeriodStart.toISOString().slice(0, 10)})`
-      : `never set (sub created ${s.createdAt.toISOString().slice(0, 10)})`;
+      : `never set (sub created ${s.createdAt.toISOString().slice(0, 10)})`) + paidSince;
     rows.push({ orgName: s.organization.name, userEmail: email, plan: s.plan, staleDesc });
   }
   return rows;

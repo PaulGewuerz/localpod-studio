@@ -170,12 +170,23 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       case 'invoice.payment_succeeded': {
         // Only update for subscription invoices with a real charge — trials
         // fire a $0 invoice at signup which must not flip status to active.
-        if (obj.subscription && obj.amount_paid > 0) {
+        //
+        // Stripe's Basil API (2025-03-31) and later — this account defaults to
+        // 2026-02-25.clover — removed the top-level invoice.subscription field,
+        // moving it under parent.subscription_details. Reading only
+        // obj.subscription left this block dead on every real invoice, so
+        // currentPeriodStart was never advanced for any paying subscriber.
+        // Resolve the id from both the legacy and Basil-era locations; the
+        // service period likewise falls back to the line item under Basil.
+        const subscriptionId = obj.subscription
+          ?? obj.parent?.subscription_details?.subscription;
+        const periodStartUnix = obj.period_start ?? obj.lines?.data?.[0]?.period?.start;
+        if (subscriptionId && obj.amount_paid > 0) {
           await prisma.subscription.updateMany({
             where: { stripeCustomerId: obj.customer },
             data: {
               status: 'active',
-              ...(obj.period_start ? { currentPeriodStart: new Date(obj.period_start * 1000) } : {}),
+              ...(periodStartUnix ? { currentPeriodStart: new Date(periodStartUnix * 1000) } : {}),
             },
           });
         }
